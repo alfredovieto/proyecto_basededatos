@@ -1,7 +1,7 @@
 # 24-0 · F1 Paddock Draft — Documento del proyecto (versión juego)
 
 **Materia:** Bases de Datos Avanzadas · **Alumno:** Alfredo Vieto · **Entrega y exposición:** jueves 19 de noviembre de 2026
-**Para:** Claude Code (VS Code). Este documento es la **única fuente de verdad del proyecto**. El proyecto ahora es **solo el juego** más una pestaña **Grafo** para explorar cómo se relacionan los pilotos. El explorador anterior (CRUD de pilotos/escuderías, fichajes, camino más corto, etc.) y `docs/definicion-proyecto.md` se retiraron.
+**Para:** Claude Code (VS Code). Este documento es la **única fuente de verdad del proyecto**. El proyecto es el juego más una pestaña **Grafo** para explorar cómo se relacionan los pilotos y una pestaña **Directores** (CRUD).
 
 **Alcance de los datos:** solo temporadas **2000–2025** (2026 sigue en curso). El seed solo carga pilotos, escuderías y directores de esos años.
 
@@ -14,10 +14,9 @@
 | **Qué es** | Juego tipo *17-0* (NFL) y *82-0* (NBA) para F1. En cada ronda sale al azar una **escudería + temporada (2000–2025)** y eliges a un piloto o al director de ese equipo y año. Con 5 elecciones armas un equipo, se simula una temporada de **24 carreras** y la meta es ir **24-0**, ganar el campeonato de constructores y que uno de tus pilotos sea campeón |
 | **Por qué es un proyecto de grafos** | El puntaje depende de la **química**, que son las relaciones del grafo entre las 5 personas que elegiste: si fueron compañeros, si el director los dirigió, si son familia o compatriotas. Calcularla es una consulta de **subgrafo inducido** con búsqueda de caminos |
 | **Paradigma / motor** | Grafo · Neo4j AuraDB Free (nube) · Cypher |
-| **Stack** | Sin cambios: Node.js 22/24 + Express 5 + `neo4j-driver` 6 + HTML/JS vanilla + vis-network |
-| **Qué se reutiliza** | La infraestructura: driver singleton, `.env`, manejo de errores, validación, `check`/`schema`/`reset` y el cálculo de `COMPANERO_DE` del seed |
-| **Qué es nuevo** | Seed recortado a 2000–2025, datos de **directores** (CSV curado, ya incluido), ratings por temporada, nodos `Director` y `Partida`, relaciones `DIRIGIO`, `DIRIGIO_A`, `RESERVA_DE` y `ELIGIO`, el motor del juego, la API de partidas, la pestaña **Grafo** y la web del juego |
-| **Qué se retiró** | Nodos `Carrera`, `Resultado`, `Circuito` y `Temporada` (el juego no los usa; los resultados de carrera solo se leen en el seed para derivar `CORRIO_PARA` y `COMPANERO_DE`), el CRUD de pilotos/escuderías, los fichajes, el CLI, Postman anterior y la web anterior |
+| **Stack** | Node.js 22/24 + Express 5 + `neo4j-driver` 6 + HTML/JS vanilla + vis-network |
+| **Componentes** | Seed de F1DB filtrado a 2000–2025, datos de **directores** (CSV curado), ratings por temporada, nodos `Director` y `Partida`, relaciones `DIRIGIO`, `DIRIGIO_A`, `RESERVA_DE` y `ELIGIO`, el motor del juego, la API de partidas y directores, la pestaña **Grafo** y la web del juego |
+| **Qué no se modela** | Carreras, resultados y circuitos como nodos: los resultados de carrera solo se leen en el seed para derivar `CORRIO_PARA` y `COMPANERO_DE` |
 
 ---
 
@@ -547,7 +546,7 @@ public/
 ## 7. Requisitos
 
 - **Sin dependencias npm nuevas.** UUID con `crypto.randomUUID()`, pruebas con `node:test` y el generador aleatorio es código propio.
-- Siguen igual: Node 22/24, `neo4j-driver` 6, Express 5, `dotenv`, `csv-parse` y `morgan` (ver `docs/requerimientos.md`).
+- Node 22/24, `neo4j-driver` 6, Express 5, `dotenv`, `csv-parse` y `morgan` (instalación y solución de problemas en el `README.md`).
 - **CDN en el front:** vis-network (ya está) y la fuente **Titillium Web** de Google Fonts (licencia OFL).
 - **Datos:** completos. 3 CSV nuevos de F1DB en `data/f1db/` + `data/curado/directores.csv`, ya incluidos. No falta conseguir nada más.
 - **Red:** igual que antes; el puerto 7687 hacia Aura debe estar abierto. Probar desde el Wi-Fi del campus.
@@ -643,7 +642,7 @@ public/
 
 ### Fase J0 — Preparación y limpieza · P0
 - [x] Crear la rama `juego-24-0` y trabajar ahí; se hace merge a `main` al cerrar la J6.
-- [x] Retirar el proyecto anterior: rutas/servicios/consultas de pilotos, escuderías, fichajes y grafo viejo, CLI, web, Postman, capturas, `definicion-proyecto.md`, `plan-desarrollo.md` y los CSV que ya no se usan (circuits, grands-prix, races).
+- [x] Dejar en el repositorio solo lo del juego (infraestructura de conexión, errores y validación reutilizable) y los CSV de F1DB que usa el seed.
 - [x] Actualizar `CLAUDE.md`: fuente de verdad = `docs/juego-24-0.md` y los comandos de §6.
 - [x] Crear `src/juego/reglas.js` con todas las constantes de §1 (`ANIO_MIN = 2000`, `ANIO_MAX = 2025`, `PUESTOS`, `PESOS`, `QUIMICA`, `TOPE_QUIMICA = 15`, `CURVA = { mu: 74, s: 5, pMax: 0.96 }`, `CARRERAS = 24`, `UMBRAL_CONSTRUCTORES = 12`, `UMBRAL_PILOTOS = 9`, `RATING_RESERVA = 30`, `RATING_SIN_CLASIFICAR = 20`).
 
@@ -657,9 +656,9 @@ public/
 **Hecho cuando:** `npm run validar-directores` reporta `275/275` y sale con código 0.
 
 ### Fase J2 — Schema + seed único (2000–2025) · P0
-- [x] `scripts/schema.cypher`: quitar lo de `Carrera`/`Circuito`/`Temporada`/`Resultado` y agregar §3.5.
+- [x] `scripts/schema.cypher` con §3.5.
 - [x] `src/juego/rating.js` con la fórmula de §1.3 (pura y probada).
-- [x] `npm run reset -- --si` (la base vieja tiene 1950–2026) y borrar las constraints que ya no aplican.
+- [x] `npm run reset -- --si` para empezar desde una base vacía.
 - [x] `scripts/seed.js`, idempotente, en este orden:
   1. Schema.
   1b. Modelo base 2000–2025 (§3.0): `Pais`, `Escuderia`, `Piloto`, `CORRIO_PARA`, `COMPANERO_DE`, `FAMILIAR_DE`.

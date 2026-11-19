@@ -1,5 +1,5 @@
 {
-  "name": "f1-paddock-graph",
+  "name": "f1-paddock-draft-24-0",
   "version": "1.0.0",
   "description": "24-0 · F1 Paddock Draft: juego de draft de F1 (2000–2025) cuya química sale de un grafo en Neo4j AuraDB",
   "type": "module",
