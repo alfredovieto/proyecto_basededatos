@@ -16,8 +16,8 @@ Proyecto final de **Bases de Datos Avanzadas** · Alfredo Vieto.
 
 ## Cómo se juega
 
-1. Escribe tu nombre y el de tu equipo → **Empezar**.
-2. **Girar**: sale una escudería + año (ej. *Williams 2003*). Tienes 1 re-roll de escudería y 1 de año.
+1. **Jugar** (sin registro).
+2. **Girar**: sale una escudería + año (ej. *Williams 2003*). Solo el primer giro es manual; después de cada elección el siguiente giro arranca solo. Tienes 1 re-roll de escudería (mismo año) y 1 de año (misma escudería).
 3. Elige un candidato (piloto, reserva o director de ese equipo y año) para un puesto libre: **Director**, **Piloto 1**, **Piloto 2**, **Flex** (piloto o director) o **Reserva**. Cada tarjeta dice con quién de tu equipo conecta.
 4. Tras 5 rondas, **Simular temporada**: `puntaje = base (ratings ponderados) + química (máx. +15)` → probabilidad de ganar cada carrera → récord, campeonato de constructores (≥ 12 victorias) y de pilotos (≥ 9 de un titular).
 
@@ -104,7 +104,7 @@ Códigos: `200/201` · `400 VALIDACION` · `404 NO_ENCONTRADO` · `409 SORTEO_PE
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/api/health` | Conexión a Aura + conteo de nodos y relaciones |
-| POST | `/api/partidas` | Crear partida `{ jugador, nombreEquipo }` |
+| POST | `/api/partidas` | Crear partida (sin body; `jugador` y `nombreEquipo` opcionales) |
 | GET | `/api/partidas?estado=terminada&limite=10` | Ranking |
 | GET · PATCH · DELETE | `/api/partidas/:id` | Leer (con elecciones y sorteo) · renombrar · borrar |
 | POST | `/api/partidas/:id/sorteo` | Girar `{ reroll: null \| "escuderia" \| "anio" }` (sorteo con `rand()` en la BD) |

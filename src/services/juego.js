@@ -60,13 +60,20 @@ async function candidatosDelSorteo(estado, consultar = leer) {
 
 // ---------- CRUD de Partida (Q-J7) ----------
 
-export async function crear(body) {
-  exigirObjeto(body);
+/** Texto opcional: si no viene (o viene vacío) se usa el valor por defecto. */
+const textoOpcional = (valor, campo, porDefecto) =>
+  valor === undefined || valor === null || (typeof valor === 'string' && valor.trim() === '')
+    ? porDefecto
+    : textoRequerido(valor, campo, MAX_TEXTO);
+
+/** Crea una partida. No hay registro: jugador y nombre de equipo son opcionales. */
+export async function crear(body = {}) {
+  exigirObjeto(body ?? {});
   const id = randomUUID();
   const [{ partida }] = await escribir(Q.CREAR_PARTIDA, {
     id,
-    jugador: textoRequerido(body.jugador, 'jugador', MAX_TEXTO),
-    nombreEquipo: textoRequerido(body.nombreEquipo, 'nombreEquipo', MAX_TEXTO),
+    jugador: textoOpcional(body?.jugador, 'jugador', 'Invitado'),
+    nombreEquipo: textoOpcional(body?.nombreEquipo, 'nombreEquipo', 'Mi equipo'),
     rerollEscuderia: int(REROLLS.escuderia),
     rerollAnio: int(REROLLS.anio),
     semilla: int(hashTexto(id)), // misma partida → misma simulación
@@ -100,7 +107,11 @@ export async function ranking(query) {
   if (query.estado !== undefined) unoDe(query.estado, 'estado', ['terminada']);
   const limite = enteroEnRango(query.limite ?? 10, 'limite', 1, 100);
   const filas = await leer(Q.RANKING, { limite: int(limite) });
-  return filas.map((f) => f.partida);
+  // Sin registro de jugador, cada fila se identifica por su equipo: los 5 elegidos en orden de roster.
+  return filas.map((f) => ({
+    ...f.partida,
+    elegidos: f.elegidos.filter(Boolean).sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot)),
+  }));
 }
 
 // ---------- Sorteo (Q-J1) ----------

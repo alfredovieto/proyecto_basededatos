@@ -64,7 +64,10 @@ async function jugarPartida() {
 async function probarErrores() {
   revisar('partida inexistente → 404', (await pedir('GET', '/partidas/00000000-0000-4000-8000-000000000000')).status === 404);
   revisar('id inválido → 400', (await pedir('GET', '/partidas/abc')).status === 400);
-  revisar('crear sin nombre → 400', (await pedir('POST', '/partidas', { jugador: '' })).status === 400);
+  const sinRegistro = await pedir('POST', '/partidas');
+  revisar('crear sin registro (sin body) → 201', sinRegistro.status === 201 && sinRegistro.datos.jugador === 'Invitado');
+  await pedir('DELETE', `/partidas/${sinRegistro.datos.id}`);
+  revisar('jugador demasiado largo → 400', (await pedir('POST', '/partidas', { jugador: 'x'.repeat(31) })).status === 400);
   revisar('ruta inexistente → 404', (await pedir('GET', '/nada')).status === 404);
 }
 

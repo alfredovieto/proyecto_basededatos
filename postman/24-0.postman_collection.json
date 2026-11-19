@@ -77,7 +77,7 @@
       "description": "Crea una partida, gira y elige 5 veces (el mejor candidato que quepa), simula, revisa el ranking y la borra. Correr con el Collection Runner.",
       "item": [
         {
-          "name": "Flujo · Crear partida",
+          "name": "Flujo · Crear partida (sin registro)",
           "event": [
             {
               "listen": "test",
@@ -95,21 +95,7 @@
           ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"jugador\": \"Postman\",\n  \"nombreEquipo\": \"Equipo Postman\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/partidas",
               "host": [
@@ -362,7 +348,9 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('la partida aparece', () => pm.expect(pm.response.json().map((p) => p.id)).to.include(pm.collectionVariables.get('partidaId')));"
+                  "const fila = pm.response.json().find((p) => p.id === pm.collectionVariables.get('partidaId'));",
+                  "pm.test('la partida aparece', () => pm.expect(fila).to.be.an('object'));",
+                  "pm.test('con sus 5 elegidos', () => pm.expect(fila.elegidos.length).to.eql(5));"
                 ]
               }
             }
@@ -512,21 +500,7 @@
           ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"jugador\": \"Postman\",\n  \"nombreEquipo\": \"Reglas\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/partidas",
               "host": [
@@ -901,7 +875,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"409 (no es candidato del sorteo)\", () => pm.response.to.have.status(409));"
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('código NO_ES_CANDIDATO', () => pm.expect(pm.response.json().error.codigo).to.eql('NO_ES_CANDIDATO'));"
                 ]
               }
             }
@@ -916,7 +891,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"personaId\": \"juan-pablo-montoya\",\n  \"rol\": \"PILOTO\",\n  \"slot\": \"RESERVA\"\n}",
+              "raw": "{\n  \"personaId\": \"ayrton-senna\",\n  \"rol\": \"PILOTO\",\n  \"slot\": \"RESERVA\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -967,7 +942,7 @@
           }
         },
         {
-          "name": "Reglas · Crear sin nombre → 400",
+          "name": "Reglas · Jugador demasiado largo → 400",
           "event": [
             {
               "listen": "test",
@@ -990,7 +965,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"jugador\": \"\"\n}",
+              "raw": "{\n  \"jugador\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

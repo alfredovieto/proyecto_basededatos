@@ -104,13 +104,16 @@ export const GUARDAR_RESULTADO = `
   RETURN pa.id AS id
 `;
 
-/** Q-J6 · Ranking de partidas terminadas. */
+/** Q-J6 · Ranking de partidas terminadas, con sus 5 elegidos (para mostrar el equipo). */
 export const RANKING = `
   MATCH (pa:Partida {estado: 'terminada'})
-  RETURN pa {.id, .jugador, .nombreEquipo, .puntaje, .victorias, .derrotas,
-             .campeonConstructores, .campeonPilotos, .terminadaEn} AS partida
+  WITH pa ORDER BY pa.puntaje DESC, pa.victorias DESC, pa.terminadaEn ASC LIMIT $limite
+  OPTIONAL MATCH (pa)-[el:ELIGIO]->(x)
+  WITH pa, collect(CASE WHEN x IS NULL THEN null
+                   ELSE {slot: el.slot, rol: el.rol, nombre: x.nombre, temporada: el.temporada} END) AS elegidos
+  RETURN pa {.id, .jugador, .nombreEquipo, .puntaje, .victorias, .derrotas, .perfecta,
+             .campeonConstructores, .campeonPilotos, .terminadaEn} AS partida, elegidos
   ORDER BY pa.puntaje DESC, pa.victorias DESC, pa.terminadaEn ASC
-  LIMIT $limite
 `;
 
 // ---------- Q-J7 · CRUD de Partida ----------

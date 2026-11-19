@@ -24,11 +24,11 @@
 ## 1. Reglas del juego
 
 ### 1.1 Flujo de una partida
-1. El jugador escribe su nombre y el nombre de su equipo → **Crear partida**.
-2. **Girar:** sale una escudería + temporada al azar entre 2000 y 2025 (por ejemplo *Williams 2003*).
+1. **Jugar** (sin registro: no se pide nombre ni equipo; la partida se identifica por sus 5 elegidos).
+2. **Girar:** sale una escudería + temporada al azar entre 2000 y 2025 (por ejemplo *Williams 2003*). Solo el **primer** giro es manual; después de cada elección el siguiente giro arranca **solo**.
 3. Se muestran los **candidatos** de ese sorteo: los pilotos que corrieron ese año, los pilotos de reserva de ese año y el director (o directores) de ese año. Cada uno trae su **rating** y una **pista de química** que dice con quién de tu equipo actual conecta.
 4. El jugador elige **un** candidato para un puesto libre compatible.
-5. Se repiten los pasos 2 a 4 hasta llenar los **5 puestos** (5 rondas).
+5. Se repiten los pasos 2 a 4 hasta llenar los **5 puestos** (5 rondas). Si nadie del sorteo cabe en los puestos libres, se gira de nuevo automáticamente (giro gratis).
 6. **Simular temporada:** se calcula el puntaje (base + química), se simulan 24 carreras y se muestran el récord (por ejemplo **19-5**) y los campeonatos.
 7. La partida queda guardada en Aura y aparece en el **Ranking**.
 
@@ -469,8 +469,8 @@ El servicio agrupa los `CORRIO_PARA` por piloto-escudería (un piloto con 5 año
 
 | Método | Ruta | Body / query | Respuesta |
 |---|---|---|---|
-| POST | `/api/partidas` | `{ jugador, nombreEquipo }` | 201 partida (`ronda: 1`, re-rolls 1/1) |
-| GET | `/api/partidas?estado=terminada&limite=10` | — | Ranking (Q-J6) |
+| POST | `/api/partidas` | sin body (opcional `{ jugador?, nombreEquipo? }`, por defecto "Invitado" / "Mi equipo") | 201 partida (`ronda: 1`, re-rolls 1/1) |
+| GET | `/api/partidas?estado=terminada&limite=10` | — | Ranking (Q-J6), cada partida con sus `elegidos` |
 | GET | `/api/partidas/:id` | — | `{ partida, elecciones, sorteo }` |
 | PATCH | `/api/partidas/:id` | `{ jugador?, nombreEquipo? }` | 200 partida |
 | DELETE | `/api/partidas/:id` | — | 200 `{ eliminada: id }` |
@@ -592,7 +592,7 @@ public/
 - **Números:** `font-variant-numeric: tabular-nums` en ratings, puntajes y tablas.
 
 ### 8.4 Pantallas
-1. **Inicio:** campo *Tu nombre* + *Nombre de tu equipo* → botón **Empezar**. Debajo, el top 5 del ranking.
+1. **Inicio:** hero con un solo botón **Jugar** (sin registro), 4 pasos de cómo se juega y el top 5 del ranking.
 2. **Draft** (pantalla principal, en dos columnas en ≥ 1200 px):
    - *Columna izquierda:* el **roster** con 5 casillas en orden (Director, Piloto 1, Piloto 2, Flex, Reserva) y debajo el **mini-grafo de química** en vivo.
    - *Columna derecha:* la **máquina de sorteo** (dos rodillos, *Escudería* y *Año*), el botón **Girar** y los botones **Re-roll escudería (1)** / **Re-roll año (1)**. Luego la lista de **tarjetas de candidato**.
@@ -602,12 +602,14 @@ public/
    - Desglose del puntaje: base por puesto + química por par.
    - El **grafo de química** grande.
    - Botones **Jugar otra vez** y **Ver ranking**.
-4. **Ranking:** tabla con posición, jugador, equipo, récord, puntaje y trofeos. Resalta la partida recién jugada.
+4. **Ranking:** tabla con posición, equipo (los apellidos de los 5 elegidos), récord, puntaje, trofeos y fecha. Resalta la partida recién jugada.
 5. **Grafo** (pestaña): rango de años (desde/hasta, 2000–2025), buscador para agregar pilotos como chips (o "Agregar a mis elegidos de la partida"), casillas para prender o apagar cada tipo de relación (Escuderías, Compañeros, Directores, Familia, País) y el grafo de vis-network con física. Al hacer clic en una arista se ve el detalle ("Compañeros 2007–2009 · McLaren").
 6. **Directores** (pestaña, CRUD): buscar, crear, renombrar y borrar directores; agregar o quitar temporadas (`DIRIGIO`) con recálculo de `DIRIGIO_A` en la misma transacción y botón "Ver consulta" con Q-J9; "Ver en el Grafo" abre a los pilotos que dirigió.
 
 ### 8.5 Componentes
-- **Rodillos de sorteo:** dos cajas que giran durante `--dur-giro` y frenan en el resultado. Con `prefers-reduced-motion` se muestra el resultado directo.
+- **Rodillos de sorteo:** tipo tragamonedas. Giran sin fin mientras la BD sortea y luego frenan con desaceleración justo en el resultado (el año frena un poco después). En un **re-roll solo gira el rodillo que cambia** (Escudería o Año). Con `prefers-reduced-motion` se muestra el resultado directo.
+- **Giro automático:** tras elegir, aviso "Siguiente sorteo…" y el giro arranca solo; los re-rolls siguen siendo manuales.
+- **Animaciones:** tarjetas que entran escalonadas (las que conectan con tu equipo brillan en naranja), la elegida "sube" y llena su casilla del roster, la química cuenta hacia arriba con un "+N" flotante, semáforo de 5 luces antes de simular, las 24 carreras se voltean una por una mientras el récord cuenta en vivo, trofeos que aparecen al final y confeti si eres campeón.
 - **Tarjeta de candidato:**
   - Nombre; insignia de rol (`PILOTO` / `DIRECTOR` / `RESERVA`); chip de rating coloreado por nivel (§8.2).
   - Pista de química: "⚡ Conecta con Hamilton, Wolff".

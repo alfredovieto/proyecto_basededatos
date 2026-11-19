@@ -183,9 +183,13 @@ function dibujarQuimica(idContenedor, quimica, elecciones, grande = false) {
 // ======================= Juego =======================
 
 const juego = {
-  partidaId: null, partida: null, elecciones: [], puestosLibres: [], sorteo: null,
-  candidatos: [], giroGratis: false, quimica: null, resultado: null, ocupado: false,
+  partidaId: null, partida: null, elecciones: [], puestosLibres: [], sorteo: null, ultimoSorteo: null,
+  candidatos: [], giroGratis: false, quimica: null, resultado: null,
+  ocupado: false, girando: false, giroProgramado: false, girosGratisSeguidos: 0, recien: null,
 };
+window.juego = juego; // para inspeccionar el estado desde la consola del navegador (y pruebas E2E)
+const ANIOS = Array.from({ length: ANIO_MAX - ANIO_MIN + 1 }, (_, i) => String(ANIO_MIN + i));
+const MAX_GIROS_GRATIS = 8; // por si acaso: nunca un ciclo infinito de giros automáticos
 
 function mostrarPantalla(nombre) {
   for (const p of ['inicio', 'draft', 'resultado']) $(`#pantalla-${p}`).hidden = p !== nombre;
@@ -213,7 +217,7 @@ function mostrarInicio() {
 /** Trae el estado de la partida (y química y candidatos si aplica) y pinta la pantalla correcta. */
 async function cargarPartida(id) {
   const estado = await api('GET', `/partidas/${id}`);
-  Object.assign(juego, estado, { partidaId: id, candidatos: [], giroGratis: false });
+  Object.assign(juego, estado, { partidaId: id, candidatos: [], giroGratis: false, ultimoSorteo: estado.sorteo });
 
   if (estado.partida.estado === 'terminada') return mostrarResultado(await api('POST', `/partidas/${id}/simular`));
 
@@ -221,6 +225,11 @@ async function cargarPartida(id) {
   if (juego.sorteo) await cargarCandidatos();
   mostrarPantalla('draft');
   pintarDraft();
+
+  // Si se recargó a media partida (ya eligió y no hay sorteo), el siguiente giro es automático.
+  if (!completo() && juego.elecciones.length > 0 && (!juego.sorteo || juego.giroGratis)) {
+    programarGiro(juego.giroGratis ? 'gratis' : 'auto');
+  }
 }
 
 async function cargarCandidatos() {
@@ -229,73 +238,184 @@ async function cargarCandidatos() {
   juego.giroGratis = datos.giroGratis;
 }
 
-async function crearPartida(evento) {
-  evento.preventDefault();
-  const formulario = new FormData(evento.target);
-  await conCarga(evento.submitter, async () => {
-    const partida = await api('POST', '/partidas', {
-      jugador: formulario.get('jugador'),
-      nombreEquipo: formulario.get('nombreEquipo'),
-    });
-    almacen.guardar('partidaEnCurso', partida.id);
-    await cargarPartida(partida.id);
-  });
-}
-
-/** Animación de los dos rodillos mientras la BD sortea; con reduced-motion se salta. */
-async function animarRodillos(promesaSorteo) {
-  const rodillos = $('.rodillos');
-  rodillos.classList.remove('listo');
-  if (!sinMovimiento()) {
-    rodillos.classList.add('girando');
-    const fin = performance.now() + parseInt(token('--dur-giro'), 10);
-    while (performance.now() < fin) {
-      $('#rodillo-escuderia').textContent = NOMBRES_GIRO[Math.floor(Math.random() * NOMBRES_GIRO.length)];
-      $('#rodillo-anio').textContent = ANIO_MIN + Math.floor(Math.random() * (ANIO_MAX - ANIO_MIN + 1));
-      await esperar(70);
-    }
-  }
-  try {
-    return await promesaSorteo;
-  } finally {
-    rodillos.classList.remove('girando');
-  }
-}
-
-async function girar(reroll = null) {
-  const boton = reroll === 'escuderia' ? $('#boton-reroll-escuderia') : reroll === 'anio' ? $('#boton-reroll-anio') : $('#boton-girar');
+/** Sin registro: un clic en "Jugar" crea la partida y abre el draft. */
+async function nuevaPartida(boton) {
   await conCarga(boton, async () => {
-    try {
-      const sorteo = await animarRodillos(api('POST', `/partidas/${juego.partidaId}/sorteo`, { reroll }));
-      juego.sorteo = { escuderiaId: sorteo.escuderiaId, escuderia: sorteo.escuderia, temporada: sorteo.temporada };
-      juego.partida.rerollEscuderia = sorteo.rerolls.escuderia;
-      juego.partida.rerollAnio = sorteo.rerolls.anio;
-      $('.rodillos').classList.add('listo');
-      await cargarCandidatos();
-    } finally {
-      pintarDraft(); // si falló, vuelve a mostrar el sorteo anterior en los rodillos
-    }
-  });
-}
-
-async function elegir(candidato, slot) {
-  await conCarga(null, async () => {
-    const { quimica } = await api('POST', `/partidas/${juego.partidaId}/elecciones`, {
-      personaId: candidato.id, rol: candidato.rol, slot,
-    });
-    Object.assign(juego, await api('GET', `/partidas/${juego.partidaId}`), { candidatos: [], giroGratis: false, quimica });
-    $('.rodillos').classList.remove('listo');
-    pintarDraft();
+    const partida = await api('POST', '/partidas');
+    almacen.guardar('partidaEnCurso', partida.id);
+    clearTimeout(temporizadorGiro); // por si quedó un giro automático de la partida anterior
+    Object.assign(juego, { resultado: null, ultimoSorteo: null, girosGratisSeguidos: 0, giroProgramado: false });
+    await cargarPartida(partida.id);
     $('#boton-girar').focus();
   });
 }
 
+// ---------- Máquina de sorteo (dos rodillos tipo tragamonedas) ----------
+
+/** n textos al azar de la lista (pueden repetirse; solo es para la animación). */
+const alAzar = (lista, n) => Array.from({ length: n }, () => lista[Math.floor(Math.random() * lista.length)]);
+
+function llenarTira(tira, textos) {
+  tira.innerHTML = textos.map((t) => `<span>${esc(t)}</span>`).join('');
+}
+
+/** Deja un rodillo quieto mostrando un texto (sin animación). */
+function fijarRodillo(selector, texto, apagado = false) {
+  const rodillo = $(selector);
+  const tira = rodillo.querySelector('.tira');
+  tira.classList.remove('sin-fin');
+  tira.style.transition = 'none';
+  tira.style.transform = 'translateY(0)';
+  llenarTira(tira, [texto]);
+  rodillo.classList.remove('girando');
+  rodillo.classList.toggle('apagado', apagado);
+}
+
+/** Fase 1: el rodillo gira sin fin mientras la BD sortea. */
+function arrancarRodillo(selector, lista) {
+  const rodillo = $(selector);
+  const tira = rodillo.querySelector('.tira');
+  rodillo.classList.remove('cayo', 'apagado');
+  rodillo.classList.add('girando');
+  tira.style.transition = 'none';
+  tira.style.transform = '';
+  const vuelta = alAzar(lista, 8);
+  llenarTira(tira, [...vuelta, ...vuelta]); // la animación CSS recorre la mitad y vuelve a empezar
+  tira.classList.add('sin-fin');
+}
+
+/** Fase 2: frena con desaceleración y se detiene exactamente en el resultado. */
+async function frenarRodillo(selector, lista, final, duracion) {
+  const rodillo = $(selector);
+  const tira = rodillo.querySelector('.tira');
+  const alto = rodillo.querySelector('.ventana').getBoundingClientRect().height;
+  const textos = [...alAzar(lista, 14), final];
+
+  tira.classList.remove('sin-fin');
+  llenarTira(tira, textos);
+  tira.style.transition = 'none';
+  tira.style.transform = 'translateY(0)';
+  void tira.offsetHeight; // fuerza el reflow para que la transición arranque desde 0
+  tira.style.transition = `transform ${duracion}ms cubic-bezier(.12, .8, .22, 1)`;
+  tira.style.transform = `translateY(-${(textos.length - 1) * alto}px)`;
+  await esperar(duracion);
+
+  fijarRodillo(selector, final);
+  rodillo.classList.add('cayo');
+}
+
+/** Pinta los rodillos con el sorteo actual (o el último, atenuado) cuando no están girando. */
+function pintarRodillosFijos() {
+  const visible = juego.sorteo ?? juego.ultimoSorteo;
+  const apagado = !juego.sorteo;
+  fijarRodillo('#rodillo-escuderia', visible?.escuderia ?? '—', apagado);
+  fijarRodillo('#rodillo-anio', visible ? String(visible.temporada) : '—', apagado);
+}
+
+/**
+ * Anima solo los rodillos que cambian: re-roll de escudería → solo Escudería;
+ * re-roll de año → solo Año; giro normal → los dos (el año frena un poco después).
+ */
+async function animarSorteo(reroll, promesa) {
+  if (sinMovimiento()) return promesa;
+  const cambiaEscuderia = reroll !== 'anio';
+  const cambiaAnio = reroll !== 'escuderia';
+  if (cambiaEscuderia) arrancarRodillo('#rodillo-escuderia', NOMBRES_GIRO);
+  if (cambiaAnio) arrancarRodillo('#rodillo-anio', ANIOS);
+
+  let sorteo;
+  try {
+    [sorteo] = await Promise.all([promesa, esperar(650)]);
+  } catch (error) {
+    pintarRodillosFijos(); // falló (ej. SIN_OPCIONES): los rodillos regresan al sorteo anterior
+    throw error;
+  }
+  await Promise.all([
+    cambiaEscuderia ? frenarRodillo('#rodillo-escuderia', NOMBRES_GIRO, sorteo.escuderia, 950) : null,
+    cambiaAnio ? frenarRodillo('#rodillo-anio', ANIOS, String(sorteo.temporada), 1300) : null,
+  ]);
+  return sorteo;
+}
+
+// ---------- Girar, elegir y simular ----------
+
+async function girar(reroll = null) {
+  const boton = reroll === 'escuderia' ? $('#boton-reroll-escuderia') : reroll === 'anio' ? $('#boton-reroll-anio') : $('#boton-girar');
+  juego.girando = true; // antes de conCarga, para que los controles ya se pinten como "sorteando"
+  const listo = await conCarga(boton, async () => {
+    try {
+      const sorteo = await animarSorteo(reroll, api('POST', `/partidas/${juego.partidaId}/sorteo`, { reroll }));
+      juego.sorteo = { escuderiaId: sorteo.escuderiaId, escuderia: sorteo.escuderia, temporada: sorteo.temporada };
+      juego.ultimoSorteo = juego.sorteo;
+      juego.partida.rerollEscuderia = sorteo.rerolls.escuderia;
+      juego.partida.rerollAnio = sorteo.rerolls.anio;
+      $('#sorteo-anuncio').textContent = `Sorteo: ${sorteo.escuderia} ${sorteo.temporada}`;
+      await cargarCandidatos();
+      return true;
+    } finally {
+      juego.girando = false;
+      pintarDraft();
+    }
+  });
+
+  // Si nadie del sorteo cabe en los puestos libres, se vuelve a girar solo (giro gratis).
+  if (listo && juego.giroGratis) {
+    juego.girosGratisSeguidos += 1;
+    if (juego.girosGratisSeguidos <= MAX_GIROS_GRATIS) programarGiro('gratis');
+  } else if (listo) {
+    juego.girosGratisSeguidos = 0;
+  }
+}
+
+/** Programa el siguiente giro automático (tras elegir, o giro gratis) con un aviso visible. */
+let temporizadorGiro = null;
+function programarGiro(motivo) {
+  clearTimeout(temporizadorGiro);
+  juego.giroProgramado = true;
+  const aviso = $('#aviso-sorteo');
+  aviso.className = 'aviso auto';
+  aviso.hidden = false;
+  aviso.textContent = motivo === 'gratis'
+    ? `Nadie de ${juego.sorteo?.escuderia ?? 'ese sorteo'} ${juego.sorteo?.temporada ?? ''} cabe en tus puestos libres: giro gratis…`
+    : 'Siguiente sorteo…';
+  pintarControles();
+  temporizadorGiro = setTimeout(async () => {
+    juego.giroProgramado = false;
+    if (juego.partida && !completo() && !$('#pantalla-draft').hidden) await girar(null);
+    else pintarControles();
+  }, motivo === 'gratis' ? 1700 : 900);
+}
+
+async function elegir(candidato, slot, tarjeta) {
+  if (juego.ocupado || juego.girando || juego.giroProgramado) return;
+  // Animación inmediata: la tarjeta elegida "sube" y las demás se desvanecen.
+  document.querySelectorAll('#candidatos .candidato').forEach((t) => t.classList.add(t === tarjeta ? 'escogida' : 'saliendo'));
+
+  const quimicaAntes = juego.quimica?.totalConTope ?? 0;
+  const listo = await conCarga(null, async () => {
+    const { quimica } = await api('POST', `/partidas/${juego.partidaId}/elecciones`, {
+      personaId: candidato.id, rol: candidato.rol, slot,
+    });
+    Object.assign(juego, await api('GET', `/partidas/${juego.partidaId}`), { candidatos: [], giroGratis: false, quimica });
+    juego.recien = slot;
+    pintarDraft();
+    animarQuimica(quimicaAntes, quimica.totalConTope);
+    return true;
+  });
+
+  if (!listo) return pintarCandidatos(); // falló: las tarjetas regresan
+  if (completo()) $('#boton-simular').focus();
+  else programarGiro('auto'); // a partir del segundo, los giros son automáticos
+}
+
 async function simular() {
+  $('.semaforo').classList.add('encendiendo'); // cinco luces, como en la salida
   await conCarga($('#boton-simular'), async () => {
-    const resultado = await api('POST', `/partidas/${juego.partidaId}/simular`);
-    mostrarResultado(resultado);
+    const [resultado] = await Promise.all([api('POST', `/partidas/${juego.partidaId}/simular`), sinMovimiento() ? 0 : esperar(1700)]);
+    await mostrarResultado(resultado, true);
     actualizarInsignia();
   });
+  $('.semaforo').classList.remove('encendiendo');
 }
 
 // ---------- Pintar el draft ----------
@@ -303,33 +423,64 @@ async function simular() {
 const completo = () => juego.puestosLibres.length === 0;
 const baseParcial = () => juego.elecciones.reduce((s, e) => s + PUESTOS.find((p) => p.slot === e.slot).peso * e.rating, 0);
 
+/** Cuenta de un número a otro (para la química y el récord). */
+async function contar(elemento, desde, hasta, formato, ms = 500) {
+  if (sinMovimiento() || desde === hasta) return void (elemento.textContent = formato(hasta));
+  const inicio = performance.now();
+  await new Promise((resolver) => {
+    const paso = (ahora) => {
+      const t = Math.min(1, (ahora - inicio) / ms);
+      elemento.textContent = formato(Math.round(desde + (hasta - desde) * t));
+      if (t < 1) requestAnimationFrame(paso); else resolver();
+    };
+    requestAnimationFrame(paso);
+  });
+}
+
+/** Si la química subió: el número cuenta hacia arriba, rebota y flota un "+N". */
+function animarQuimica(antes, despues) {
+  if (despues <= antes) return;
+  const valor = $('#draft-quimica');
+  contar(valor, antes, despues, (n) => `+${n}`, 700);
+  valor.classList.remove('sube');
+  void valor.offsetWidth;
+  valor.classList.add('sube');
+  const flotante = document.createElement('span');
+  flotante.className = 'flotante';
+  flotante.textContent = `+${despues - antes} química`;
+  $('.dato-quimica').append(flotante);
+  setTimeout(() => flotante.remove(), 1500);
+}
+
 function pintarDraft() {
-  $('#draft-equipo').textContent = juego.partida.nombreEquipo;
-  $('#draft-ronda').textContent = `${Math.min(juego.elecciones.length + 1, PUESTOS.length)}/${PUESTOS.length}`;
+  const hechas = juego.elecciones.length;
+  $('#draft-ronda').textContent = `${Math.min(hechas + 1, PUESTOS.length)}/${PUESTOS.length}`;
+  $('#progreso').innerHTML = PUESTOS.map((_, i) => `<li class="${i < hechas ? 'hecha' : i === hechas ? 'actual' : ''}"></li>`).join('');
   $('#draft-base').textContent = baseParcial().toFixed(1);
   $('#draft-quimica').textContent = `+${juego.quimica?.totalConTope ?? 0}`;
-  $('#rodillo-escuderia').textContent = juego.sorteo?.escuderia ?? '—';
-  $('#rodillo-anio').textContent = juego.sorteo?.temporada ?? '—';
+  if (!juego.girando) pintarRodillosFijos();
   pintarRoster();
   pintarCandidatos();
   pintarControles();
   $('#listo-simular').hidden = !completo();
   $('.maquina').hidden = completo();
 
-  const totalQ = juego.quimica?.totalConTope ?? 0;
-  $('#total-quimica-mini').textContent = `+${totalQ}`;
+  $('#total-quimica-mini').textContent = `+${juego.quimica?.totalConTope ?? 0}`;
   $('#quimica-vacia').hidden = (juego.quimica?.aristas.length ?? 0) > 0;
   dibujarQuimica('grafo-quimica-mini', juego.quimica, juego.elecciones);
 }
 
 function pintarRoster() {
+  // Los puestos libres donde cabe algún candidato del sorteo se resaltan.
+  const disponibles = new Set(juego.candidatos.flatMap((c) => c.puestosCompatibles));
   $('#roster').innerHTML = PUESTOS.map(({ slot, nombre }) => {
     const e = juego.elecciones.find((x) => x.slot === slot);
-    if (!e) return `<li class="casilla vacia"><span class="puesto">${nombre}</span><span>Libre</span><span></span></li>`;
-    return `<li class="casilla"><span class="puesto">${nombre}</span>
+    if (!e) return `<li class="casilla vacia ${disponibles.has(slot) ? 'disponible' : ''}"><span class="puesto">${nombre}</span><span>Libre</span><span></span></li>`;
+    return `<li class="casilla ${juego.recien === slot ? 'recien' : ''}"><span class="puesto">${nombre}</span>
       <span><span class="nombre">${esc(e.nombre)}</span><br><span class="origen">${esc(e.escuderia)} ${e.temporada} · ronda ${e.ronda}</span></span>
       ${chipRating(e.rating)}</li>`;
   }).join('');
+  juego.recien = null;
 }
 
 function etiquetaRol(c) {
@@ -339,17 +490,19 @@ function etiquetaRol(c) {
 }
 
 function tarjetaCandidato(c, i) {
+  const cabe = c.puestosCompatibles.length > 0;
   const pista = c.conectaCon.length
     ? `<p class="pista">⚡ Conecta con ${c.conectaCon.map((n) => esc(apellido(n))).join(', ')}</p>`
     : '<p class="pista nada">Sin conexión directa con tu equipo</p>';
   const botones = c.yaElegido
     ? '<span class="suave">Ya está en tu equipo</span>'
-    : c.puestosCompatibles.length === 0
+    : !cabe
       ? '<span class="suave">No cabe en tus puestos libres</span>'
       : c.puestosCompatibles.map((slot) =>
           `<button class="boton chico" type="button" data-candidato="${i}" data-slot="${slot}"
              aria-label="Elegir a ${esc(c.nombre)} para ${NOMBRE_PUESTO[slot]}">→ ${NOMBRE_PUESTO[slot]}</button>`).join('');
-  return `<article class="candidato ${c.yaElegido ? 'elegido' : ''}" tabindex="0" data-indice="${i}">
+  const clases = ['candidato', c.yaElegido && 'elegido', !c.yaElegido && !cabe && 'no-cabe', cabe && c.conectaCon.length && 'conecta'];
+  return `<article class="${clases.filter(Boolean).join(' ')}" style="--i:${i}" tabindex="0" data-indice="${i}">
     <div class="cabeza"><span class="nombre">${esc(c.nombre)}</span>${chipRating(c.rating)}</div>
     <div>${etiquetaRol(c)}</div>${pista}<div class="botones-puesto">${botones}</div></article>`;
 }
@@ -358,25 +511,29 @@ function pintarCandidatos() {
   $('#candidatos').innerHTML = juego.candidatos.map(tarjetaCandidato).join('');
 }
 
-/** Habilita/deshabilita los botones según el estado (y mientras hay una petición en curso). */
+/** Habilita/deshabilita los botones según el estado (petición en curso, giro animándose o programado). */
 function pintarControles() {
   if (!juego.partida || $('#pantalla-draft').hidden) return;
   const p = juego.partida;
   const sinSorteo = !juego.sorteo;
+  const bloqueado = juego.ocupado || juego.girando || juego.giroProgramado;
   const girarPermitido = !completo() && (sinSorteo || juego.giroGratis);
 
-  $('#boton-girar').disabled = juego.ocupado || !girarPermitido;
-  $('#boton-girar').textContent = juego.giroGratis ? 'Girar gratis' : 'Girar';
-  $('#boton-reroll-escuderia').disabled = juego.ocupado || sinSorteo || p.rerollEscuderia <= 0;
-  $('#boton-reroll-escuderia').textContent = `Re-roll escudería (${p.rerollEscuderia})`;
-  $('#boton-reroll-anio').disabled = juego.ocupado || sinSorteo || p.rerollAnio <= 0;
-  $('#boton-reroll-anio').textContent = `Re-roll año (${p.rerollAnio})`;
-  document.querySelectorAll('#candidatos button').forEach((b) => (b.disabled = juego.ocupado));
+  $('#boton-girar').disabled = bloqueado || !girarPermitido;
+  $('#boton-reroll-escuderia').disabled = bloqueado || sinSorteo || juego.giroGratis || p.rerollEscuderia <= 0;
+  $('#boton-reroll-escuderia .cuenta').textContent = p.rerollEscuderia;
+  $('#boton-reroll-anio').disabled = bloqueado || sinSorteo || juego.giroGratis || p.rerollAnio <= 0;
+  $('#boton-reroll-anio .cuenta').textContent = p.rerollAnio;
+  document.querySelectorAll('#candidatos button').forEach((b) => (b.disabled = bloqueado));
 
+  if (juego.giroProgramado) return; // el aviso lo maneja programarGiro()
   const aviso = $('#aviso-sorteo');
+  aviso.className = juego.girando ? 'aviso auto' : 'aviso';
   aviso.hidden = false;
-  if (juego.giroGratis) aviso.textContent = 'Nadie de este sorteo cabe en tus puestos libres: el siguiente giro es gratis.';
-  else if (sinSorteo && !completo()) aviso.textContent = 'Pulsa Girar (o Enter) para sortear escudería y año.';
+  if (juego.girando) aviso.textContent = 'Sorteando escudería y año…';
+  else if (sinSorteo && !completo() && juego.elecciones.length === 0) aviso.textContent = 'Pulsa Girar (o Enter) para empezar. Después del primero, los giros son automáticos.';
+  else if (sinSorteo && !completo()) aviso.textContent = 'Pulsa Girar para continuar.'; // solo si un giro automático falló
+  else if (juego.sorteo) aviso.textContent = 'Elige a uno para un puesto libre, o usa un re-roll.';
   else aviso.hidden = true;
 }
 
@@ -394,11 +551,26 @@ function pintarTrofeo(id, ganado, texto) {
   $(id).querySelector('small').textContent = texto;
 }
 
-function pintarCarreras(r) {
+/** Las 24 casillas; si `revelar`, empiezan boca abajo y se voltean una por una. */
+function pintarCarreras(r, revelar) {
   const nombres = Object.fromEntries(r.titulares.map((t) => [t.id, t.nombre]));
-  $('#carreras').innerHTML = r.carreras.map((c, i) =>
-    `<span class="carrera ${c.gano ? 'gano' : ''}" style="animation-delay:${sinMovimiento() ? 0 : i * 60}ms"
-       title="Carrera ${c.numero}: ${c.gano ? `ganó ${esc(nombres[c.ganadorId])}` : 'perdida'}">${c.numero}</span>`).join('');
+  $('#carreras').innerHTML = r.carreras.map((c) => {
+    const estado = revelar ? '' : `revelada ${c.gano ? 'gano' : 'perdio'}`;
+    return `<span class="carrera ${estado}" title="Carrera ${c.numero}: ${c.gano ? `ganó ${esc(nombres[c.ganadorId])}` : 'perdida'}">${c.numero}</span>`;
+  }).join('');
+}
+
+/** Voltea las carreras una por una mientras el récord cuenta en vivo. */
+async function revelarCarreras(r) {
+  const casillas = [...document.querySelectorAll('#carreras .carrera')];
+  const record = $('#resultado-record');
+  let ganadas = 0;
+  for (const [i, carrera] of r.carreras.entries()) {
+    if (carrera.gano) ganadas++;
+    casillas[i].classList.add('revelada', carrera.gano ? 'gano' : 'perdio');
+    record.textContent = `${ganadas}-${i + 1 - ganadas}`;
+    await esperar(carrera.gano ? 120 : 90);
+  }
 }
 
 function pintarDesglose(r) {
@@ -421,35 +593,88 @@ function pintarListaQuimica(quimica) {
     : '<li>Tu equipo no tenía conexiones en el grafo.</li>';
 }
 
-function mostrarResultado(r) {
+/**
+ * Pantalla de resultado. Con `animar`, las carreras se voltean una por una, el récord cuenta en vivo,
+ * los trofeos aparecen al final y hay confeti si fue campeón.
+ */
+async function mostrarResultado(r, animar = false) {
   juego.resultado = r;
   juego.quimica = r.quimica;
   almacen.guardar('partidaEnCurso', null);
   almacen.guardar('ultimaPartida', r.partidaId);
   mostrarPantalla('resultado');
 
-  $('#resultado-equipo').textContent = `${r.jugador} · ${r.nombreEquipo}`;
-  $('#resultado-record').textContent = r.record;
-  $('#resultado-record').classList.toggle('perfecta', r.perfecta);
-  $('#resultado-frase').textContent = fraseResultado(r);
-  pintarCarreras(r);
-
   const campeon = r.titulares.find((t) => t.id === r.campeonPilotosId);
   pintarTrofeo('#trofeo-constructores', r.campeonConstructores, `${r.victorias} victorias (mínimo 12)`);
   pintarTrofeo('#trofeo-pilotos', r.campeonPilotos, campeon ? `${campeon.nombre} · ${campeon.victorias}` : r.titulares.map((t) => `${apellido(t.nombre)} ${t.victorias}`).join(' · '));
   pintarTrofeo('#trofeo-perfecta', r.perfecta, r.perfecta ? '¡Perfecta!' : `${r.derrotas} derrota(s)`);
-
   pintarDesglose(r);
   $('#total-quimica-grande').textContent = `+${r.quimica.puntos}`;
   pintarListaQuimica(r.quimica);
   dibujarQuimica('grafo-quimica-grande', r.quimica, r.quimica.nodos, true);
+
+  const record = $('#resultado-record');
+  const frase = $('#resultado-frase');
+  const trofeos = $('#trofeos');
+  record.classList.remove('perfecta', 'final');
+  trofeos.classList.remove('revelar');
+  const conAnimacion = animar && !sinMovimiento();
+  pintarCarreras(r, conAnimacion);
+
+  if (conAnimacion) {
+    record.textContent = '0-0';
+    frase.textContent = '';
+    frase.classList.remove('visible');
+    trofeos.classList.add('oculto');
+    await esperar(400);
+    await revelarCarreras(r);
+  }
+
+  record.textContent = r.record;
+  record.classList.toggle('perfecta', r.perfecta);
+  record.classList.add('final');
+  frase.textContent = fraseResultado(r);
+  frase.classList.add('visible');
+  trofeos.classList.remove('oculto');
+  trofeos.classList.add('revelar');
+  if (conAnimacion && r.campeonConstructores) confeti(r.perfecta ? 320 : 160);
 }
 
+/** Confeti en un canvas: se dispara al ser campeón (más si fue 24-0). */
+function confeti(cantidad) {
+  const lienzo = $('#confeti');
+  const ctx = lienzo.getContext('2d');
+  lienzo.width = innerWidth;
+  lienzo.height = innerHeight;
+  const colores = [token('--acento'), token('--rating-elite'), token('--exito'), token('--q-dirigio'), '#ffffff'];
+  const piezas = Array.from({ length: cantidad }, () => ({
+    x: Math.random() * lienzo.width, y: -20 - Math.random() * lienzo.height * 0.6,
+    vx: (Math.random() - 0.5) * 4, vy: 2 + Math.random() * 4, giro: Math.random() * Math.PI, vGiro: (Math.random() - 0.5) * 0.3,
+    ancho: 6 + Math.random() * 6, alto: 8 + Math.random() * 8, color: colores[Math.floor(Math.random() * colores.length)],
+  }));
+  const fin = performance.now() + 4000;
+  const cuadro = () => {
+    ctx.clearRect(0, 0, lienzo.width, lienzo.height);
+    for (const p of piezas) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.04; p.giro += p.vGiro;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.giro);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.ancho / 2, -p.alto / 2, p.ancho, p.alto);
+      ctx.restore();
+    }
+    if (performance.now() < fin) requestAnimationFrame(cuadro);
+    else ctx.clearRect(0, 0, lienzo.width, lienzo.height);
+  };
+  requestAnimationFrame(cuadro);
+}
+
+/** "Jugar otra vez" crea otra partida y va directo al draft. */
 function jugarOtraVez() {
   almacen.guardar('partidaEnCurso', null);
-  Object.assign(juego, { partidaId: null, partida: null, elecciones: [], sorteo: null, candidatos: [], quimica: null, resultado: null });
-  mostrarInicio();
-  $('#form-inicio input[name="jugador"]').focus();
+  Object.assign(juego, { partidaId: null, partida: null, elecciones: [], sorteo: null, candidatos: [], quimica: null });
+  nuevaPartida($('#boton-otra'));
 }
 
 // ======================= Ranking =======================
@@ -462,13 +687,21 @@ function trofeosTexto(p) {
   return lista.join(' · ') || '—';
 }
 
+const fechaCorta = (iso) => (iso ? new Date(iso).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+
+/** Sin registro de jugador: cada partida se identifica por sus 5 elegidos. */
+function equipoTexto(p) {
+  return (p.elegidos ?? []).map((e) => `<span title="${esc(`${NOMBRE_PUESTO[e.slot]}: ${e.nombre} (${e.temporada})`)}">${esc(apellido(e.nombre))}</span>`).join(' · ');
+}
+
 function tablaRanking(partidas) {
   if (partidas.length === 0) return '<p class="suave">Todavía no hay partidas terminadas. ¡Sé el primero!</p>';
   const ultima = almacen.leer('ultimaPartida');
   const filas = partidas.map((p, i) => `<tr class="${p.id === ultima ? 'resaltada' : ''}">
-    <td class="num">${i + 1}</td><td>${esc(p.jugador)}</td><td>${esc(p.nombreEquipo)}</td>
-    <td class="num"><strong>${p.victorias}-${p.derrotas}</strong></td><td class="num">${p.puntaje.toFixed(1)}</td><td>${trofeosTexto(p)}</td></tr>`).join('');
-  return `<table><thead><tr><th class="num">#</th><th>Jugador</th><th>Equipo</th><th class="num">Récord</th><th class="num">Puntaje</th><th>Trofeos</th></tr></thead><tbody>${filas}</tbody></table>`;
+    <td class="num">${i + 1}</td><td>${equipoTexto(p)}</td>
+    <td class="num"><strong>${p.victorias}-${p.derrotas}</strong></td><td class="num">${p.puntaje.toFixed(1)}</td>
+    <td>${trofeosTexto(p)}</td><td class="suave">${fechaCorta(p.terminadaEn)}</td></tr>`).join('');
+  return `<table><thead><tr><th class="num">#</th><th>Equipo</th><th class="num">Récord</th><th class="num">Puntaje</th><th>Trofeos</th><th>Cuándo</th></tr></thead><tbody>${filas}</tbody></table>`;
 }
 
 async function cargarRanking() {
@@ -942,7 +1175,7 @@ function conectarDirectores() {
 // ======================= Eventos =======================
 
 function conectarJuego() {
-  $('#form-inicio').addEventListener('submit', crearPartida);
+  $('#boton-jugar').addEventListener('click', (e) => nuevaPartida(e.currentTarget));
   $('#boton-girar').addEventListener('click', () => girar(null));
   $('#boton-reroll-escuderia').addEventListener('click', () => girar('escuderia'));
   $('#boton-reroll-anio').addEventListener('click', () => girar('anio'));
@@ -952,12 +1185,12 @@ function conectarJuego() {
 
   $('#candidatos').addEventListener('click', (e) => {
     const boton = e.target.closest('button[data-slot]');
-    if (boton) elegir(juego.candidatos[Number(boton.dataset.candidato)], boton.dataset.slot);
+    if (boton) elegir(juego.candidatos[Number(boton.dataset.candidato)], boton.dataset.slot, boton.closest('.candidato'));
   });
 
   // Teclado (§8.6): Enter = Girar; 1–5 = elegir el puesto en la tarjeta enfocada.
   document.addEventListener('keydown', (e) => {
-    if ($('#vista-juego').hidden || $('#pantalla-draft').hidden || juego.ocupado) return;
+    if ($('#vista-juego').hidden || $('#pantalla-draft').hidden || juego.ocupado || juego.girando) return;
     if (e.target.closest('input, select, textarea, dialog')) return;
     if (e.key === 'Enter' && !e.target.closest('button') && !$('#boton-girar').disabled) {
       e.preventDefault();
@@ -969,7 +1202,7 @@ function conectarJuego() {
     if (!tarjeta || !(numero >= 1 && numero <= PUESTOS.length)) return;
     const candidato = juego.candidatos[Number(tarjeta.dataset.indice)];
     const slot = PUESTOS[numero - 1].slot;
-    if (candidato.puestosCompatibles.includes(slot)) elegir(candidato, slot);
+    if (candidato.puestosCompatibles.includes(slot)) elegir(candidato, slot, tarjeta);
     else toast(`${candidato.nombre} no cabe en ${NOMBRE_PUESTO[slot]}.`);
   });
 

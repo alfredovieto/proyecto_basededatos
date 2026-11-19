@@ -35,15 +35,20 @@
       <!-- Inicio -->
       <div id="pantalla-inicio" class="pantalla inicio">
         <div class="hero">
-          <h1 class="display">¿Puedes ir <span class="acento">24-0</span>?</h1>
-          <p class="lead">Cada ronda sale una escudería y un año al azar (2000–2025). Elige a un piloto o al director,
-            arma un equipo de 5 y simula una temporada de 24 carreras. La <strong>química</strong> entre tus elegidos sale del grafo.</p>
+          <div class="pista-fondo" aria-hidden="true"></div>
+          <p class="sobretitulo">F1 Paddock Draft · 2000–2025</p>
+          <h1 class="display titulo-hero">¿Puedes ir <span class="acento">24-0</span>?</h1>
+          <p class="lead">Arma un equipo de 5 con pilotos y directores de la historia reciente de la F1 y gana las 24 carreras.</p>
+          <button id="boton-jugar" class="boton primario enorme" type="button">Jugar</button>
         </div>
-        <form id="form-inicio" class="tarjeta form-inicio" autocomplete="off">
-          <label>Tu nombre <input name="jugador" maxlength="30" required placeholder="Ej. Alfredo"></label>
-          <label>Nombre de tu equipo <input name="nombreEquipo" maxlength="30" required placeholder="Ej. Scuderia Vieto"></label>
-          <button class="boton primario grande" type="submit">Empezar</button>
-        </form>
+
+        <ol class="pasos">
+          <li><span class="paso-num">1</span><strong>Gira</strong><span>Sale una escudería y un año al azar.</span></li>
+          <li><span class="paso-num">2</span><strong>Elige</strong><span>Un piloto o el director de ese equipo para uno de tus 5 puestos.</span></li>
+          <li><span class="paso-num">3</span><strong>Conecta</strong><span>Compañeros, director y familia suman <em>química</em> desde el grafo.</span></li>
+          <li><span class="paso-num">4</span><strong>Simula</strong><span>24 carreras. ¿Campeón de constructores? ¿24-0?</span></li>
+        </ol>
+
         <div class="tarjeta">
           <h2>Top 5</h2>
           <div id="top-inicio" class="tabla-contenedor"><p class="suave">Cargando ranking…</p></div>
@@ -53,10 +58,12 @@
       <!-- Draft -->
       <div id="pantalla-draft" class="pantalla" hidden>
         <div class="barra-draft">
-          <div><span class="suave">Equipo</span> <strong id="draft-equipo"></strong></div>
-          <div><span class="suave">Ronda</span> <strong id="draft-ronda" class="num">1/5</strong></div>
-          <div><span class="suave">Base parcial</span> <strong id="draft-base" class="num">0</strong></div>
-          <div><span class="suave">Química</span> <strong id="draft-quimica" class="num">0</strong></div>
+          <div class="progreso-rondas" aria-label="Progreso del draft">
+            <span class="suave">Ronda</span> <strong id="draft-ronda" class="num">1/5</strong>
+            <ol id="progreso" class="progreso"></ol>
+          </div>
+          <div class="dato"><span class="suave">Base parcial</span> <strong id="draft-base" class="num">0</strong></div>
+          <div class="dato dato-quimica"><span class="suave">Química</span> <strong id="draft-quimica" class="num">+0</strong></div>
         </div>
 
         <div class="draft">
@@ -80,14 +87,21 @@
 
           <div class="columna">
             <div class="tarjeta maquina">
-              <div class="rodillos" aria-live="polite" id="sorteo-anuncio">
-                <div class="rodillo"><small>Escudería</small><span id="rodillo-escuderia">—</span></div>
-                <div class="rodillo rodillo-anio"><small>Año</small><span id="rodillo-anio">—</span></div>
+              <div class="rodillos" id="rodillos">
+                <div class="rodillo" id="rodillo-escuderia">
+                  <small>Escudería</small>
+                  <div class="ventana"><div class="tira"><span>—</span></div></div>
+                </div>
+                <div class="rodillo rodillo-anio" id="rodillo-anio">
+                  <small>Año</small>
+                  <div class="ventana"><div class="tira"><span>—</span></div></div>
+                </div>
               </div>
+              <p id="sorteo-anuncio" class="solo-lector" aria-live="polite"></p>
               <div class="acciones-sorteo">
                 <button id="boton-girar" class="boton primario grande" type="button">Girar</button>
-                <button id="boton-reroll-escuderia" class="boton" type="button">Re-roll escudería (1)</button>
-                <button id="boton-reroll-anio" class="boton" type="button">Re-roll año (1)</button>
+                <button id="boton-reroll-escuderia" class="boton reroll" type="button" title="Mismo año, otra escudería">↻ Escudería <span class="cuenta">1</span></button>
+                <button id="boton-reroll-anio" class="boton reroll" type="button" title="Misma escudería, otro año">↻ Año <span class="cuenta">1</span></button>
               </div>
               <p id="aviso-sorteo" class="aviso" hidden></p>
             </div>
@@ -95,9 +109,11 @@
             <div id="candidatos" class="candidatos" aria-live="polite"></div>
 
             <div id="listo-simular" class="tarjeta listo" hidden>
-              <h2>¡Equipo completo!</h2>
-              <p class="suave">Ya tienes a tus 5. Veamos cómo te va en 24 carreras.</p>
-              <button id="boton-simular" class="boton primario grande" type="button">Simular temporada</button>
+              <p class="sobretitulo">Equipo completo</p>
+              <h2 class="display listo-titulo">Luces fuera</h2>
+              <p class="suave">Tus 5 están listos. Veamos cómo te va en 24 carreras.</p>
+              <div class="semaforo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+              <button id="boton-simular" class="boton primario enorme" type="button">Simular temporada</button>
             </div>
           </div>
         </div>
@@ -106,11 +122,11 @@
       <!-- Resultado -->
       <div id="pantalla-resultado" class="pantalla" hidden>
         <div class="resultado-hero" aria-live="polite">
-          <p id="resultado-equipo" class="suave"></p>
+          <p class="sobretitulo">Tu temporada</p>
           <div id="resultado-record" class="record display">0-0</div>
           <p id="resultado-frase" class="frase"></p>
           <div id="carreras" class="carreras" aria-label="Resultado de cada carrera"></div>
-          <div class="trofeos">
+          <div class="trofeos" id="trofeos">
             <div id="trofeo-constructores" class="trofeo"><span class="icono">🏆</span><span>Constructores</span><small></small></div>
             <div id="trofeo-pilotos" class="trofeo"><span class="icono">🏆</span><span>Pilotos</span><small></small></div>
             <div id="trofeo-perfecta" class="trofeo"><span class="icono">★</span><span>24-0</span><small></small></div>
@@ -232,5 +248,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="alert" hidden></div>
+  <canvas id="confeti" class="confeti" aria-hidden="true"></canvas>
 </body>
 </html>
