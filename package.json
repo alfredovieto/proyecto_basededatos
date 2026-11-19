@@ -16,7 +16,6 @@
     "reset": "node scripts/reset.js",
     "limpiar-demo": "node scripts/limpiar-demo.js",
     "validar-directores": "node scripts/validar-directores.js",
-    "calibrar": "node scripts/calibrar.js",
     "smoke": "node scripts/smoke.js",
     "test": "node --test"
   },

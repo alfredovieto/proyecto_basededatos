@@ -103,7 +103,7 @@ Curva calibrada (`mu = 74`, `s = 5`, `pMax = 0.96`):
 
 El tope `pMax = 0.96` hace que incluso el mejor equipo posible tenga solo ~38 % de ir 24-0, igual que en los juegos originales: la temporada perfecta tiene que costar.
 
-**Calibración ya hecha con los datos reales** (incluye los directores): se simularon 20 000 drafts con un jugador que toma al mejor disponible y aprovecha la química. Dio una mediana de 58.5 puntos y un p90 de 82.9. Con esta curva, el campeonato de constructores sale en **22.6 %** de las partidas y el 24-0 en **3.0 %**. Las metas son 15–25 % y 1–3 %. `npm run calibrar` (Fase J3) vuelve a correr esa simulación por si se cambian pesos o química.
+**Calibración ya hecha con los datos reales** (incluye los directores): se simularon 20 000 drafts con un jugador que toma al mejor disponible y aprovecha la química. Dio una mediana de 58.5 puntos y un p90 de 82.9. Con esta curva, el campeonato de constructores sale en **22.6 %** de las partidas y el 24-0 en **3.0 %**. Las metas son 15–25 % y 1–3 %.
 
 ---
 
@@ -180,7 +180,7 @@ Como se borró todo lo demás, el seed es **uno solo** (`npm run seed`): carga e
 
 | Tipo | Dirección | Propiedades | Origen | Cantidad aprox. |
 |---|---|---|---|---|
-| `CORRIO_PARA` *(ampliada)* | (Piloto) → (Escuderia) | + rating, posicionCampeonato, puntosTemporada, campeon | seed, a partir de `seasons-driver-standings` | 3 566 (todas) |
+| `CORRIO_PARA` *(ampliada)* | (Piloto) → (Escuderia) | + rating, posicionCampeonato, puntosTemporada, campeon | seed, a partir de `seasons-driver-standings` | 636 |
 | `RESERVA_DE` | (Piloto) → (Escuderia) | temporada | seed, a partir de `seasons-entrants-drivers` (`testDriver = true`) | 177 (2000–2025; 178 filas con 1 repetida) |
 | `DIRIGIO` | (Director) → (Escuderia) | temporada, rating, posicionConstructores, campeon, notas | seed, a partir de `directores.csv` + `seasons-constructor-standings` | 300 |
 | `DIRIGIO_A` | (Director) → (Piloto) | temporadas[], escuderias[] | **derivada con Cypher** a partir de `DIRIGIO` + `CORRIO_PARA` | ~370 |
@@ -518,7 +518,6 @@ scripts/
 ├── schema.cypher · schema.js · lib/schema.js
 ├── seed.js                       # seed único: base 2000–2025 + juego
 ├── validar-directores.js
-├── calibrar.js                   # opcional: Monte Carlo para ajustar la curva
 ├── check.js · reset.js
 ├── limpiar-demo.js               # borra partidas y directores creados desde la app
 └── smoke.js                      # partida completa + grafo
@@ -539,7 +538,7 @@ public/
 ├── index.html · app.js · estilos.css    # una sola página con pestañas: Juego · Grafo · Ranking
 ```
 
-**Scripts npm:** `check`, `schema`, `seed`, `reset`, `limpiar-demo`, `dev`, `start`, `smoke`, `validar-directores`, `calibrar` y `test` (`node --test`).
+**Scripts npm:** `check`, `schema`, `seed`, `reset`, `limpiar-demo`, `dev`, `start`, `smoke`, `validar-directores` y `test` (`node --test`).
 
 ---
 
@@ -683,7 +682,6 @@ public/
   - `elegirTitulares(elecciones)`
   - `simularTemporada({ puntaje, titulares, semilla }) → { victorias, derrotas, record, victoriasPorTitular, campeonConstructores, campeonPilotos }`
 - [x] `test/*.test.js` con `node:test`: rating del campeón = 100; tope de química; misma semilla → mismo resultado; la suma de las victorias de los titulares = victorias del equipo.
-- [ ] `scripts/calibrar.js` (P2, opcional): 20 000 drafts *greedy* contra la BD real; imprime los % de constructores y de 24-0. La curva ya viene calibrada (§1.5), así que solo hace falta si se cambian pesos o química.
 
 **Hecho cuando:** `npm test` pasa.
 
@@ -745,7 +743,7 @@ public/
 | Justificación del modelo (15 %) | La química son relaciones de varios tipos entre 5 nodos, más caminos de 2 saltos. En SQL serían 10 pares × (tabla de compañeros + JOIN director-temporada-equipo-piloto + familia + nacionalidad) y una CTE recursiva por par. En Cypher es un patrón (Q-J4). También el multi-label (piloto y director a la vez) y agregar `DIRIGIO_A` sin migrar el esquema |
 | Diseño NoSQL (20 %) | §3: labels, propiedades en las relaciones (rating por temporada), relaciones derivadas, constraints e índices |
 | Código e integración cloud (25 %) | Driver singleton, `executeRead`/`executeWrite`, transacción al elegir, parámetros, `neo4j.int`, `.env`, `rand()` en la BD |
-| Documentación (20 %) | Este documento, la definición, el catálogo Q-J1 a Q-J10, los diagramas y el README |
+| Documentación (20 %) | Este documento, la definición, el catálogo Q-J1 a Q-J11, los diagramas y el README |
 | Exposición (20 %) | El profe juega; botón "Ver consulta"; `PROFILE` preparado |
 
 **Preguntas probables y respuesta corta**
