@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>24-0 · F1 Paddock Draft</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+  <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js" defer></script>
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <header class="encabezado">
+    <a class="marca" href="#juego" aria-label="24-0, inicio">
+      <span class="marca-logo">24-0</span>
+      <span class="marca-sub">F1 Paddock Draft</span>
+    </a>
+    <nav class="pestanas" aria-label="Secciones">
+      <a href="#juego" data-vista="juego">Juego</a>
+      <a href="#grafo" data-vista="grafo">Grafo</a>
+      <a href="#ranking" data-vista="ranking">Ranking</a>
+      <a href="#directores" data-vista="directores">Directores</a>
+    </nav>
+    <div id="insignia-aura" class="insignia" title="Conexión a Neo4j AuraDB">
+      <span class="punto"></span><span class="texto">Conectando a Aura…</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- ==================== JUEGO ==================== -->
+    <section id="vista-juego" class="vista" hidden>
+
+      <!-- Inicio -->
+      <div id="pantalla-inicio" class="pantalla inicio">
+        <div class="hero">
+          <h1 class="display">¿Puedes ir <span class="acento">24-0</span>?</h1>
+          <p class="lead">Cada ronda sale una escudería y un año al azar (2000–2025). Elige a un piloto o al director,
+            arma un equipo de 5 y simula una temporada de 24 carreras. La <strong>química</strong> entre tus elegidos sale del grafo.</p>
+        </div>
+        <form id="form-inicio" class="tarjeta form-inicio" autocomplete="off">
+          <label>Tu nombre <input name="jugador" maxlength="30" required placeholder="Ej. Alfredo"></label>
+          <label>Nombre de tu equipo <input name="nombreEquipo" maxlength="30" required placeholder="Ej. Scuderia Vieto"></label>
+          <button class="boton primario grande" type="submit">Empezar</button>
+        </form>
+        <div class="tarjeta">
+          <h2>Top 5</h2>
+          <div id="top-inicio" class="tabla-contenedor"><p class="suave">Cargando ranking…</p></div>
+        </div>
+      </div>
+
+      <!-- Draft -->
+      <div id="pantalla-draft" class="pantalla" hidden>
+        <div class="barra-draft">
+          <div><span class="suave">Equipo</span> <strong id="draft-equipo"></strong></div>
+          <div><span class="suave">Ronda</span> <strong id="draft-ronda" class="num">1/5</strong></div>
+          <div><span class="suave">Base parcial</span> <strong id="draft-base" class="num">0</strong></div>
+          <div><span class="suave">Química</span> <strong id="draft-quimica" class="num">0</strong></div>
+        </div>
+
+        <div class="draft">
+          <div class="columna">
+            <div class="tarjeta">
+              <h2>Tu equipo</h2>
+              <ol id="roster" class="roster"></ol>
+            </div>
+            <div class="tarjeta">
+              <div class="titulo-con-accion">
+                <h2>Química</h2>
+                <button class="boton chico" data-consulta="quimica" type="button">Ver consulta</button>
+              </div>
+              <div class="grafo-quimica-contenedor">
+                <div id="grafo-quimica-mini" class="grafo grafo-mini"></div>
+                <div class="total-quimica" aria-hidden="true"><span id="total-quimica-mini">0</span><small>química</small></div>
+              </div>
+              <p id="quimica-vacia" class="suave centrado">Sin química todavía: elige a alguien conectado.</p>
+            </div>
+          </div>
+
+          <div class="columna">
+            <div class="tarjeta maquina">
+              <div class="rodillos" aria-live="polite" id="sorteo-anuncio">
+                <div class="rodillo"><small>Escudería</small><span id="rodillo-escuderia">—</span></div>
+                <div class="rodillo rodillo-anio"><small>Año</small><span id="rodillo-anio">—</span></div>
+              </div>
+              <div class="acciones-sorteo">
+                <button id="boton-girar" class="boton primario grande" type="button">Girar</button>
+                <button id="boton-reroll-escuderia" class="boton" type="button">Re-roll escudería (1)</button>
+                <button id="boton-reroll-anio" class="boton" type="button">Re-roll año (1)</button>
+              </div>
+              <p id="aviso-sorteo" class="aviso" hidden></p>
+            </div>
+
+            <div id="candidatos" class="candidatos" aria-live="polite"></div>
+
+            <div id="listo-simular" class="tarjeta listo" hidden>
+              <h2>¡Equipo completo!</h2>
+              <p class="suave">Ya tienes a tus 5. Veamos cómo te va en 24 carreras.</p>
+              <button id="boton-simular" class="boton primario grande" type="button">Simular temporada</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resultado -->
+      <div id="pantalla-resultado" class="pantalla" hidden>
+        <div class="resultado-hero" aria-live="polite">
+          <p id="resultado-equipo" class="suave"></p>
+          <div id="resultado-record" class="record display">0-0</div>
+          <p id="resultado-frase" class="frase"></p>
+          <div id="carreras" class="carreras" aria-label="Resultado de cada carrera"></div>
+          <div class="trofeos">
+            <div id="trofeo-constructores" class="trofeo"><span class="icono">🏆</span><span>Constructores</span><small></small></div>
+            <div id="trofeo-pilotos" class="trofeo"><span class="icono">🏆</span><span>Pilotos</span><small></small></div>
+            <div id="trofeo-perfecta" class="trofeo"><span class="icono">★</span><span>24-0</span><small></small></div>
+          </div>
+        </div>
+
+        <div class="resultado-grid">
+          <div class="tarjeta">
+            <h2>Puntaje</h2>
+            <div id="desglose"></div>
+          </div>
+          <div class="tarjeta">
+            <div class="titulo-con-accion">
+              <h2>Grafo de química</h2>
+              <button class="boton chico" data-consulta="quimica" type="button">Ver consulta</button>
+            </div>
+            <div class="grafo-quimica-contenedor grande">
+              <div id="grafo-quimica-grande" class="grafo"></div>
+              <div class="total-quimica" aria-hidden="true"><span id="total-quimica-grande">0</span><small>química</small></div>
+            </div>
+            <ul id="lista-quimica" class="lista-quimica"></ul>
+          </div>
+        </div>
+
+        <div class="acciones-resultado">
+          <button id="boton-otra" class="boton primario grande" type="button">Jugar otra vez</button>
+          <a class="boton grande" href="#grafo" id="boton-ver-grafo">Ver mis elegidos en el Grafo</a>
+          <a class="boton grande" href="#ranking">Ver ranking</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== GRAFO ==================== -->
+    <section id="vista-grafo" class="vista" hidden>
+      <div class="grafo-layout">
+        <aside class="tarjeta panel-grafo">
+          <h2>Explorar relaciones</h2>
+          <p class="suave">Elige pilotos y un rango de años para ver cómo se conectan.</p>
+
+          <div class="rango">
+            <label>Desde <select id="grafo-desde"></select></label>
+            <label>Hasta <select id="grafo-hasta"></select></label>
+          </div>
+
+          <label class="buscador">Agregar piloto
+            <input id="grafo-buscar" type="search" placeholder="Escribe un nombre…" autocomplete="off"
+                   role="combobox" aria-expanded="false" aria-controls="grafo-sugerencias">
+          </label>
+          <ul id="grafo-sugerencias" class="sugerencias" role="listbox" hidden></ul>
+
+          <div class="botones-fila">
+            <button id="grafo-mis-elegidos" class="boton chico" type="button">+ Mis elegidos</button>
+            <button id="grafo-parrilla" class="boton chico" type="button">+ Pilotos del rango</button>
+            <button id="grafo-limpiar" class="boton chico" type="button">Limpiar</button>
+          </div>
+          <div id="grafo-chips" class="chips"></div>
+
+          <fieldset class="filtros">
+            <legend>Relaciones</legend>
+            <label><input type="checkbox" value="CORRIO_PARA" checked> <span class="muestra m-escuderia"></span> Escuderías</label>
+            <label><input type="checkbox" value="COMPANERO_DE" checked> <span class="muestra m-companeros"></span> Compañeros</label>
+            <label><input type="checkbox" value="DIRIGIO_A" checked> <span class="muestra m-dirigio"></span> Directores</label>
+            <label><input type="checkbox" value="FAMILIAR_DE" checked> <span class="muestra m-familia"></span> Familia</label>
+            <label><input type="checkbox" value="ES_DE"> <span class="muestra m-pais"></span> País</label>
+          </fieldset>
+
+          <button id="grafo-consulta" class="boton chico" data-consulta="grafo" type="button">Ver consulta</button>
+        </aside>
+
+        <div class="tarjeta lienzo-grafo">
+          <div id="grafo-explorador" class="grafo grafo-explorador"></div>
+          <p id="grafo-vacio" class="vacio">Agrega pilotos para ver su grafo.</p>
+          <div id="grafo-detalle" class="detalle-arista" aria-live="polite" hidden></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== RANKING ==================== -->
+    <section id="vista-ranking" class="vista" hidden>
+      <div class="tarjeta">
+        <h1 class="display chico">Ranking</h1>
+        <div id="tabla-ranking" class="tabla-contenedor"><p class="suave">Cargando…</p></div>
+      </div>
+    </section>
+
+    <!-- ==================== DIRECTORES (CRUD) ==================== -->
+    <section id="vista-directores" class="vista" hidden>
+      <div class="directores-layout">
+        <aside class="panel-directores">
+          <div class="tarjeta">
+            <h2>Directores</h2>
+            <label>Buscar <input id="dir-buscar" type="search" placeholder="Ej. Horner, Vasseur…" autocomplete="off"></label>
+            <ul id="dir-lista" class="dir-lista" aria-live="polite"></ul>
+          </div>
+          <form id="dir-form-nuevo" class="tarjeta" autocomplete="off">
+            <h2>Nuevo director</h2>
+            <label>Id (slug) <input name="id" required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="ej. profe-demo"></label>
+            <label>Nombre <input name="nombre" required maxlength="60" placeholder="Ej. Profe Demo"></label>
+            <label>País <select name="paisId" id="dir-paises" required></select></label>
+            <button class="boton primario" type="submit">Crear</button>
+          </form>
+        </aside>
+
+        <div id="dir-detalle" class="tarjeta dir-detalle">
+          <p class="suave">Elige un director de la lista o crea uno nuevo.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal "Ver consulta" (modo profe) -->
+  <dialog id="modal-consulta" class="modal">
+    <div class="modal-cabeza">
+      <h2 id="modal-titulo">Consulta Cypher</h2>
+      <button class="boton chico" type="button" data-cerrar>Cerrar</button>
+    </div>
+    <p id="modal-tiempo" class="suave"></p>
+    <pre><code id="modal-cypher"></code></pre>
+  </dialog>
+
+  <div id="toast" class="toast" role="alert" hidden></div>
+</body>
+</html>

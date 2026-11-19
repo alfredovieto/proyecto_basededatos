@@ -1,0 +1,1784 @@
+{
+  "info": {
+    "name": "24-0 · F1 Paddock Draft",
+    "description": "API del juego 24-0 (Neo4j AuraDB). Levanta la API con `npm start` y corre la colección completa con el Collection Runner.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api"
+    },
+    {
+      "key": "partidaId",
+      "value": ""
+    },
+    {
+      "key": "partidaReglas",
+      "value": ""
+    },
+    {
+      "key": "personaId",
+      "value": ""
+    },
+    {
+      "key": "rol",
+      "value": ""
+    },
+    {
+      "key": "slot",
+      "value": ""
+    },
+    {
+      "key": "giros",
+      "value": "0"
+    },
+    {
+      "key": "record",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0 · Sistema",
+      "item": [
+        {
+          "name": "Sistema · Health (Aura)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('conectado a Aura', () => pm.expect(pm.response.json().baseDeDatos.host).to.include('neo4j.io'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 · Flujo partida completa",
+      "description": "Crea una partida, gira y elige 5 veces (el mejor candidato que quepa), simula, revisa el ranking y la borra. Correr con el Collection Runner.",
+      "item": [
+        {
+          "name": "Flujo · Crear partida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const p = pm.response.json();",
+                  "pm.test('ronda 1 y re-rolls 1/1', () => { pm.expect(p.ronda).to.eql(1); pm.expect(p.rerollEscuderia).to.eql(1); pm.expect(p.rerollAnio).to.eql(1); });",
+                  "pm.collectionVariables.set('partidaId', p.id);",
+                  "pm.collectionVariables.set('giros', 0);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jugador\": \"Postman\",\n  \"nombreEquipo\": \"Equipo Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Flujo · Girar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const s = pm.response.json();",
+                  "pm.test('sorteo en 2000–2025', () => { pm.expect(s.escuderiaId).to.be.a('string'); pm.expect(s.temporada).to.be.within(2000, 2025); });",
+                  "pm.collectionVariables.set('giros', Number(pm.collectionVariables.get('giros')) + 1);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reroll\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaId}}/sorteo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaId}}",
+                "sorteo"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Flujo · Candidatos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('hay candidatos con rating', () => d.candidatos.forEach((c) => pm.expect(c.rating).to.be.a('number')));",
+                  "// Jugador \"greedy\": el de mejor rating que quepa en algún puesto libre.",
+                  "const posibles = d.candidatos.filter((c) => c.puestosCompatibles.length > 0).sort((a, b) => b.rating - a.rating);",
+                  "if (posibles.length === 0) {",
+                  "  pm.test('giro gratis (nadie cabe)', () => pm.expect(d.giroGratis).to.eql(true));",
+                  "  if (Number(pm.collectionVariables.get('giros')) < 20) (pm.execution && pm.execution.setNextRequest ? pm.execution.setNextRequest('Flujo · Girar') : postman.setNextRequest('Flujo · Girar'));",
+                  "} else {",
+                  "  const c = posibles[0];",
+                  "  pm.collectionVariables.set('personaId', c.id);",
+                  "  pm.collectionVariables.set('rol', c.rol);",
+                  "  pm.collectionVariables.set('slot', c.puestosCompatibles[0]);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaId}}/candidatos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaId}}",
+                "candidatos"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Flujo · Elegir",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('la elección guarda una foto (rating, temporada, escudería)', () => { pm.expect(r.eleccion.rating).to.be.a('number'); pm.expect(r.eleccion.escuderiaId).to.be.a('string'); });",
+                  "pm.test('química con tope de 15', () => pm.expect(r.quimica.totalConTope).to.be.at.most(15));",
+                  "if (r.siguienteRonda <= 5) (pm.execution && pm.execution.setNextRequest ? pm.execution.setNextRequest('Flujo · Girar') : postman.setNextRequest('Flujo · Girar'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personaId\": \"{{personaId}}\",\n  \"rol\": \"{{rol}}\",\n  \"slot\": \"{{slot}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaId}}/elecciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaId}}",
+                "elecciones"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Flujo · Química",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const q = pm.response.json();",
+                  "pm.test('5 nodos', () => pm.expect(q.nodos.length).to.eql(5));",
+                  "pm.test('total = suma de aristas', () => pm.expect(q.total).to.eql(q.aristas.reduce((s, a) => s + a.puntos, 0)));",
+                  "pm.test('incluye el Cypher de Q-J4', () => pm.expect(q.consulta.cypher).to.include('shortestPath'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaId}}/quimica",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaId}}",
+                "quimica"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Flujo · Simular",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('24 carreras', () => pm.expect(r.victorias + r.derrotas).to.eql(24));",
+                  "pm.test('récord con formato V-D', () => pm.expect(r.record).to.match(/^\\d{1,2}-\\d{1,2}$/));",
+                  "pm.test('victorias de titulares = del equipo', () => pm.expect(r.titulares.reduce((s, t) => s + t.victorias, 0)).to.eql(r.victorias));",
+                  "pm.collectionVariables.set('record', r.record);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaId}}/simular",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaId}}",
+                "simular"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Flujo · Simular otra vez (misma semilla)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('mismo récord (simulación reproducible)', () => pm.expect(pm.response.json().record).to.eql(pm.collectionVariables.get('record')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaId}}/simular",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaId}}",
+                "simular"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Flujo · Ranking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('la partida aparece', () => pm.expect(pm.response.json().map((p) => p.id)).to.include(pm.collectionVariables.get('partidaId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/partidas?estado=terminada&limite=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "terminada"
+                },
+                {
+                  "key": "limite",
+                  "value": "100"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Flujo · Renombrar partida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('nombre nuevo', () => pm.expect(pm.response.json().nombreEquipo).to.include('renombrado'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreEquipo\": \"Equipo Postman (renombrado)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Flujo · Borrar partida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Flujo · Partida borrada → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('código NO_ENCONTRADO', () => pm.expect(pm.response.json().error.codigo).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Reglas y errores del juego",
+      "item": [
+        {
+          "name": "Reglas · Crear partida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('partidaReglas', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jugador\": \"Postman\",\n  \"nombreEquipo\": \"Reglas\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Elegir sin sorteo → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('código SIN_SORTEO', () => pm.expect(pm.response.json().error.codigo).to.eql('SIN_SORTEO'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personaId\": \"max-verstappen\",\n  \"rol\": \"PILOTO\",\n  \"slot\": \"PILOTO_1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaReglas}}/elecciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaReglas}}",
+                "elecciones"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Re-roll sin sorteo → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('código SIN_SORTEO', () => pm.expect(pm.response.json().error.codigo).to.eql('SIN_SORTEO'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reroll\": \"escuderia\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaReglas}}/sorteo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaReglas}}",
+                "sorteo"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Girar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reroll\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaReglas}}/sorteo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaReglas}}",
+                "sorteo"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Girar otra vez → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('código SORTEO_PENDIENTE', () => pm.expect(pm.response.json().error.codigo).to.eql('SORTEO_PENDIENTE'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reroll\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaReglas}}/sorteo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaReglas}}",
+                "sorteo"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Re-roll de escudería",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 409) {",
+                  "  pm.test('sin opciones (no gasta)', () => pm.expect(pm.response.json().error.codigo).to.eql('SIN_OPCIONES'));",
+                  "} else {",
+                  "  pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "  pm.test('re-roll gastado', () => pm.expect(pm.response.json().rerolls.escuderia).to.eql(0));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reroll\": \"escuderia\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaReglas}}/sorteo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaReglas}}",
+                "sorteo"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Re-roll de escudería otra vez → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('código SIN_REROLLS', () => pm.expect(pm.response.json().error.codigo).to.eql('SIN_REROLLS'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reroll\": \"escuderia\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaReglas}}/sorteo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaReglas}}",
+                "sorteo"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Re-roll inválido → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('código VALIDACION', () => pm.expect(pm.response.json().error.codigo).to.eql('VALIDACION'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reroll\": \"piloto\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaReglas}}/sorteo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaReglas}}",
+                "sorteo"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Rol incompatible con el puesto → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('código VALIDACION', () => pm.expect(pm.response.json().error.codigo).to.eql('VALIDACION'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personaId\": \"max-verstappen\",\n  \"rol\": \"PILOTO\",\n  \"slot\": \"DIRECTOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaReglas}}/elecciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaReglas}}",
+                "elecciones"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Alguien que no es del sorteo → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 (no es candidato del sorteo)\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personaId\": \"juan-pablo-montoya\",\n  \"rol\": \"PILOTO\",\n  \"slot\": \"RESERVA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaReglas}}/elecciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaReglas}}",
+                "elecciones"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Simular incompleta → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('código EQUIPO_INCOMPLETO', () => pm.expect(pm.response.json().error.codigo).to.eql('EQUIPO_INCOMPLETO'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaReglas}}/simular",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaReglas}}",
+                "simular"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Crear sin nombre → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('código VALIDACION', () => pm.expect(pm.response.json().error.codigo).to.eql('VALIDACION'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jugador\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/partidas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Id inválido → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('código VALIDACION', () => pm.expect(pm.response.json().error.codigo).to.eql('VALIDACION'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/partidas/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "abc"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Partida inexistente → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('código NO_ENCONTRADO', () => pm.expect(pm.response.json().error.codigo).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/partidas/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reglas · Borrar partida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/partidas/{{partidaReglas}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "partidas",
+                "{{partidaReglas}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Grafo",
+      "item": [
+        {
+          "name": "Grafo · Autocompletar \"perez\" 2011–2024",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('encuentra a Checo', () => pm.expect(pm.response.json().map((p) => p.id)).to.include('sergio-perez'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pilotos?buscar=perez&desde=2011&hasta=2024",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pilotos"
+              ],
+              "query": [
+                {
+                  "key": "buscar",
+                  "value": "perez"
+                },
+                {
+                  "key": "desde",
+                  "value": "2011"
+                },
+                {
+                  "key": "hasta",
+                  "value": "2024"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Grafo · Alonso, Hamilton y Räikkönen 2007–2009",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const g = pm.response.json();",
+                  "pm.test('Alonso y Hamilton compañeros en 2007', () => pm.expect(g.aristas.some((a) => a.tipo === 'COMPANERO_DE' && a.detalle.includes('2007'))).to.eql(true));",
+                  "pm.test('aparecen sus directores', () => pm.expect(g.nodos.filter((n) => n.tipo === 'DIRECTOR').map((n) => n.label)).to.include.members(['Ron Dennis', 'Jean Todt']));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/grafo?pilotos=fernando-alonso,lewis-hamilton,kimi-raikkonen&desde=2007&hasta=2009",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grafo"
+              ],
+              "query": [
+                {
+                  "key": "pilotos",
+                  "value": "fernando-alonso,lewis-hamilton,kimi-raikkonen"
+                },
+                {
+                  "key": "desde",
+                  "value": "2007"
+                },
+                {
+                  "key": "hasta",
+                  "value": "2009"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Grafo · Familia Verstappen",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('una arista FAMILIAR_DE', () => pm.expect(pm.response.json().aristas.filter((a) => a.tipo === 'FAMILIAR_DE').length).to.eql(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/grafo?pilotos=max-verstappen,jos-verstappen&incluir=familia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grafo"
+              ],
+              "query": [
+                {
+                  "key": "pilotos",
+                  "value": "max-verstappen,jos-verstappen"
+                },
+                {
+                  "key": "incluir",
+                  "value": "familia"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Grafo · Rango invertido → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('código VALIDACION', () => pm.expect(pm.response.json().error.codigo).to.eql('VALIDACION'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/grafo?pilotos=fernando-alonso&desde=2010&hasta=2005",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grafo"
+              ],
+              "query": [
+                {
+                  "key": "pilotos",
+                  "value": "fernando-alonso"
+                },
+                {
+                  "key": "desde",
+                  "value": "2010"
+                },
+                {
+                  "key": "hasta",
+                  "value": "2005"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Grafo · Sin pilotos → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('código VALIDACION', () => pm.expect(pm.response.json().error.codigo).to.eql('VALIDACION'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/grafo?desde=2010&hasta=2012",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grafo"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2010"
+                },
+                {
+                  "key": "hasta",
+                  "value": "2012"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Directores (CRUD)",
+      "item": [
+        {
+          "name": "Directores · Limpiar corrida anterior",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 o 404', () => pm.expect([200, 404]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/directores/postman-director",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores",
+                "postman-director"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Buscar sin acentos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Frédéric Vasseur', () => pm.expect(pm.response.json()[0].nombre).to.eql('Frédéric Vasseur'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/directores?buscar=frederic",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores"
+              ],
+              "query": [
+                {
+                  "key": "buscar",
+                  "value": "frederic"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Detalle (Horner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Red Bull 2023 vale 100', () => pm.expect(pm.response.json().temporadas.find((t) => t.temporada === 2023).rating).to.eql(100));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/directores/christian-horner",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores",
+                "christian-horner"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Piloto y director (Albers)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('mismo nodo :Piloto:Director', () => pm.expect(pm.response.json().esPiloto).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/directores/christijan-albers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores",
+                "christijan-albers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Crear",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('sin temporadas', () => pm.expect(pm.response.json().temporadas.length).to.eql(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"postman-director\",\n  \"nombre\": \"Postman Director\",\n  \"paisId\": \"mexico\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/directores",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Crear repetido → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('código DUPLICADO', () => pm.expect(pm.response.json().error.codigo).to.eql('DUPLICADO'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"postman-director\",\n  \"nombre\": \"Otro\",\n  \"paisId\": \"mexico\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/directores",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Agregar Ferrari 2024 (recalcula DIRIGIO_A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('dirigió a Leclerc, Sainz y Bearman', () => pm.expect(r.director.pilotosDirigidos.map((p) => p.id)).to.have.members(['charles-leclerc', 'carlos-sainz-jr', 'oliver-bearman']));",
+                  "pm.test('rating copiado de la clasificación', () => pm.expect(r.agregada.rating).to.be.above(80));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"escuderiaId\": \"ferrari\",\n  \"temporada\": 2024\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/directores/postman-director/temporadas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores",
+                "postman-director",
+                "temporadas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Temporada repetida → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('código DUPLICADO', () => pm.expect(pm.response.json().error.codigo).to.eql('DUPLICADO'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"escuderiaId\": \"ferrari\",\n  \"temporada\": 2024\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/directores/postman-director/temporadas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores",
+                "postman-director",
+                "temporadas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Escudería que no corrió → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('código SIN_TEMPORADA', () => pm.expect(pm.response.json().error.codigo).to.eql('SIN_TEMPORADA'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"escuderiaId\": \"brawn\",\n  \"temporada\": 2010\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/directores/postman-director/temporadas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores",
+                "postman-director",
+                "temporadas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Renombrar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('nombre nuevo', () => pm.expect(pm.response.json().nombre).to.eql('Postman Director Jr.'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Postman Director Jr.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/directores/postman-director",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores",
+                "postman-director"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Quitar Ferrari 2024",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ya no dirigió a nadie', () => pm.expect(pm.response.json().pilotosDirigidos).to.eql(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/directores/postman-director/temporadas/ferrari/2024",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores",
+                "postman-director",
+                "temporadas",
+                "ferrari",
+                "2024"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Borrar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/directores/postman-director",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores",
+                "postman-director"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Directores · Borrado → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('código NO_ENCONTRADO', () => pm.expect(pm.response.json().error.codigo).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/directores/postman-director",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "directores",
+                "postman-director"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

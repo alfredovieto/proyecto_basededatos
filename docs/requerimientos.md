@@ -29,7 +29,7 @@ Después de instalar Node o Git con `winget`, **cierra y vuelve a abrir VS Code*
 | GitHub | ✅ repo creado | Privado, `proyecto_basededatos`. La carpeta se conecta en la Fase 0 del plan |
 
 **Límites de AuraDB Free que hay que tener presentes**
-- Hasta 200 000 nodos y 400 000 relaciones. El proyecto usa ~30 400 nodos y ~96 000 relaciones.
+- Hasta 200 000 nodos y 400 000 relaciones. El proyecto usa ~330 nodos y ~2 000 relaciones (solo 2000–2025), más las partidas que se jueguen.
 - Se **pausa sola tras 3 días sin actividad**. Se reanuda desde console.neo4j.io sin perder datos. Revísala antes de exponer.
 - No hay backups automáticos; si hace falta, se repite el `npm run seed`, que es idempotente.
 
@@ -55,7 +55,7 @@ Reglas:
 
 ## 4. Dependencias npm
 
-Se instalan en la Fase 1 del plan, al crear el `package.json`.
+Ya están en `package.json`; se instalan con `npm install`. El juego no agrega dependencias (UUID con `crypto.randomUUID()`, pruebas con `node:test`).
 
 | Paquete | Versión | Uso |
 |---|---|---|
@@ -103,7 +103,9 @@ npm install neo4j-driver@^6 express@^5 dotenv csv-parse morgan
 - [ ] `git config --global user.name` y `user.email` configurados (si no, pedírselos al usuario)
 - [ ] La instancia de Aura aparece como *Running* en console.neo4j.io (lo confirma el usuario)
 
-La conexión real a Aura se prueba en la Fase 1 con `npm run check`, cuando ya existan el `package.json` y el `.env`.
+La conexión real a Aura se prueba con `npm run check`, cuando ya existan el `package.json` y el `.env`.
+
+> **OneDrive y `npm run dev`:** al sincronizar, OneDrive modifica archivos y `node --watch` reinicia el servidor solo (a veces a mitad de una petición). Para la demo usa `npm start`.
 
 ---
 

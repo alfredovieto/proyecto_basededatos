@@ -1,0 +1,32 @@
+{
+  "name": "f1-paddock-graph",
+  "version": "1.0.0",
+  "description": "24-0 · F1 Paddock Draft: juego de draft de F1 (2000–2025) cuya química sale de un grafo en Neo4j AuraDB",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "check": "node scripts/check.js",
+    "schema": "node scripts/schema.js",
+    "seed": "node scripts/seed.js",
+    "reset": "node scripts/reset.js",
+    "limpiar-demo": "node scripts/limpiar-demo.js",
+    "validar-directores": "node scripts/validar-directores.js",
+    "calibrar": "node scripts/calibrar.js",
+    "smoke": "node scripts/smoke.js",
+    "test": "node --test"
+  },
+  "author": "Alfredo Vieto",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "csv-parse": "^7.0.3",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "morgan": "^1.12.1",
+    "neo4j-driver": "^6.3.2"
+  }
+}

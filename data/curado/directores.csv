@@ -1,0 +1,94 @@
+directorId,nombre,paisId,pilotoId,escuderiaId,desde,hasta,notas,fuente,confianza
+jean-todt,Jean Todt,france,,ferrari,2000,2007,,Wikipedia – Scuderia Ferrari,alta
+stefano-domenicali,Stefano Domenicali,italy,,ferrari,2008,2014,renunció en abril de 2014,Wikipedia – Scuderia Ferrari,alta
+marco-mattiacci,Marco Mattiacci,italy,,ferrari,2014,2014,abril a noviembre de 2014,Wikipedia – Scuderia Ferrari,alta
+maurizio-arrivabene,Maurizio Arrivabene,italy,,ferrari,2015,2018,,Wikipedia – Scuderia Ferrari,alta
+mattia-binotto,Mattia Binotto,switzerland,,ferrari,2019,2022,suizo-italiano,Wikipedia – Scuderia Ferrari,alta
+frederic-vasseur,Frédéric Vasseur,france,,ferrari,2023,2025,,Wikipedia – Scuderia Ferrari,alta
+ron-dennis,Ron Dennis,united-kingdom,,mclaren,2000,2008,jefe de equipo hasta marzo de 2009,Wikipedia – McLaren,alta
+martin-whitmarsh,Martin Whitmarsh,united-kingdom,,mclaren,2009,2013,,Wikipedia – McLaren,alta
+eric-boullier,Éric Boullier,france,,mclaren,2014,2018,racing director; salió en julio de 2018,Wikipedia – McLaren,media
+zak-brown,Zak Brown,united-states-of-america,,mclaren,2018,2018,CEO; dirigió tras la salida de Boullier,Wikipedia – McLaren,media
+andreas-seidl,Andreas Seidl,germany,,mclaren,2019,2022,,Wikipedia – McLaren,alta
+andrea-stella,Andrea Stella,italy,,mclaren,2023,2025,,Wikipedia – McLaren,alta
+frank-williams,Frank Williams,united-kingdom,,williams,2000,2012,fundador,Wikipedia – Williams Racing,alta
+claire-williams,Claire Williams,united-kingdom,,williams,2013,2020,"deputy team principal, a cargo del día a día",Wikipedia – Williams Racing,media
+simon-roberts,Simon Roberts,united-kingdom,,williams,2020,2021,interino tras la venta a Dorilton (sept 2020),Wikipedia – Williams Racing,media
+jost-capito,Jost Capito,germany,,williams,2021,2022,CEO y jefe de equipo,Wikipedia – Williams Racing,alta
+james-vowles,James Vowles,united-kingdom,,williams,2023,2025,,Wikipedia – Williams Racing,alta
+craig-pollock,Craig Pollock,united-kingdom,,bar,2000,2001,,Wikipedia – British American Racing,alta
+david-richards,David Richards,united-kingdom,,bar,2002,2004,,Wikipedia – British American Racing,alta
+nick-fry,Nick Fry,united-kingdom,,bar,2005,2005,,Wikipedia – British American Racing,alta
+nick-fry,Nick Fry,united-kingdom,,honda,2006,2007,después CEO cuando llegó Brawn,verificado: flyinglap.com.br / crash.net,alta
+ross-brawn,Ross Brawn,united-kingdom,,honda,2008,2008,,verificado: f1technical.net,alta
+ross-brawn,Ross Brawn,united-kingdom,,brawn,2009,2009,dueño y jefe de equipo,Wikipedia – Brawn GP,alta
+ross-brawn,Ross Brawn,united-kingdom,,mercedes,2010,2013,,Wikipedia – Mercedes en F1,alta
+toto-wolff,Toto Wolff,austria,,mercedes,2014,2025,,Wikipedia – Mercedes en F1,alta
+flavio-briatore,Flavio Briatore,italy,,benetton,2000,2001,regresó en marzo de 2000 en lugar de Rocco Benetton,verificado: atlasf1 / grandprix.com,alta
+flavio-briatore,Flavio Briatore,italy,,renault,2002,2009,renunció en septiembre de 2009,Wikipedia – Renault en F1,alta
+bob-bell,Bob Bell,united-kingdom,,renault,2009,2009,interino desde septiembre de 2009,Wikipedia – Renault en F1,media
+eric-boullier,Éric Boullier,france,,renault,2010,2011,,Wikipedia – Renault en F1,alta
+frederic-vasseur,Frédéric Vasseur,france,,renault,2016,2016,,Wikipedia – Renault en F1,alta
+cyril-abiteboul,Cyril Abiteboul,france,,renault,2016,2020,director general en 2016; jefe de equipo 2017–2020,Wikipedia – Renault en F1,alta
+eric-boullier,Éric Boullier,france,,lotus-f1,2012,2013,,verificado: formulaonehistory.com,alta
+gerard-lopez,Gérard López,luxembourg,,lotus-f1,2014,2015,dueño y jefe de equipo titular,verificado: grandprix.com / Wikipedia,alta
+federico-gastaldi,Federico Gastaldi,argentina,,lotus-f1,2014,2015,deputy team principal,verificado: Wikipedia – Federico Gastaldi,alta
+marcin-budkowski,Marcin Budkowski,poland,,alpine,2021,2021,director ejecutivo; en 2021 no hubo team principal oficial,verificado: autosport.com,alta
+davide-brivio,Davide Brivio,italy,,alpine,2021,2021,racing director,verificado: autosport.com,alta
+otmar-szafnauer,Otmar Szafnauer,united-states-of-america,,alpine,2022,2023,salió en julio de 2023,Wikipedia – Alpine F1 Team,alta
+bruno-famin,Bruno Famin,france,,alpine,2023,2024,interino desde julio de 2023,Wikipedia – Alpine F1 Team,media
+oliver-oakes,Oliver Oakes,united-kingdom,,alpine,2024,2025,desde agosto de 2024; renunció en mayo de 2025,verificado: the-race.com,alta
+flavio-briatore,Flavio Briatore,italy,,alpine,2025,2025,"asesor ejecutivo, a cargo de facto desde mayo de 2025",Wikipedia – Alpine F1 Team,media
+christian-horner,Christian Horner,united-kingdom,,red-bull,2005,2025,salió en julio de 2025,Wikipedia – Red Bull Racing,alta
+laurent-mekies,Laurent Mekies,france,,red-bull,2025,2025,desde julio de 2025,Wikipedia – Red Bull Racing,alta
+franz-tost,Franz Tost,austria,,toro-rosso,2006,2019,,Wikipedia – Racing Bulls,alta
+franz-tost,Franz Tost,austria,,alphatauri,2020,2023,,Wikipedia – Racing Bulls,alta
+laurent-mekies,Laurent Mekies,france,,rb,2024,2024,,Wikipedia – Racing Bulls,alta
+laurent-mekies,Laurent Mekies,france,,racing-bulls,2025,2025,hasta julio de 2025,Wikipedia – Racing Bulls,alta
+alan-permane,Alan Permane,united-kingdom,,racing-bulls,2025,2025,desde julio de 2025,Wikipedia – Racing Bulls,alta
+jackie-stewart,Jackie Stewart,united-kingdom,jackie-stewart,jaguar,2000,2000,presidente al inicio de 2000; también fue piloto,verificado: motorsport.com,media
+neil-ressler,Neil Ressler,united-states-of-america,,jaguar,2000,2000,presidente; dirigió el equipo en 2000,verificado: grandprix.com,alta
+bobby-rahal,Bobby Rahal,united-states-of-america,bobby-rahal,jaguar,2001,2001,CEO y jefe de equipo hasta agosto de 2001; también fue piloto,verificado: grandprix.com,alta
+niki-lauda,Niki Lauda,austria,niki-lauda,jaguar,2001,2002,jefe de equipo desde agosto de 2001; también fue piloto,verificado: crash.net / autosport.com,alta
+tony-purnell,Tony Purnell,united-kingdom,,jaguar,2003,2004,con David Pitchforth como director general,verificado: grandprix.com,alta
+eddie-jordan,Eddie Jordan,ireland,,jordan,2000,2004,fundador,Wikipedia – Jordan Grand Prix,alta
+colin-kolles,Colin Kolles,germany,,jordan,2005,2005,tras la compra de Midland; rumano-alemán,verificado: Wikipedia – Colin Kolles,alta
+colin-kolles,Colin Kolles,germany,,midland,2006,2006,,verificado: Wikipedia – Colin Kolles,alta
+colin-kolles,Colin Kolles,germany,,spyker,2007,2007,,verificado: Wikipedia – Colin Kolles,alta
+colin-kolles,Colin Kolles,germany,,force-india,2008,2008,,verificado: f1technical.net,alta
+vijay-mallya,Vijay Mallya,india,,force-india,2009,2018,dueño y jefe de equipo,verificado: f1technical.net / pitpass.com,alta
+otmar-szafnauer,Otmar Szafnauer,united-states-of-america,,force-india,2018,2018,Racing Point Force India desde agosto de 2018,Wikipedia – Force India,media
+otmar-szafnauer,Otmar Szafnauer,united-states-of-america,,racing-point,2019,2020,,Wikipedia – Racing Point,alta
+otmar-szafnauer,Otmar Szafnauer,united-states-of-america,,aston-martin,2021,2021,,Wikipedia – Aston Martin en F1,alta
+mike-krack,Mike Krack,luxembourg,,aston-martin,2022,2024,,verificado: the-race.com,alta
+andy-cowell,Andy Cowell,united-kingdom,,aston-martin,2025,2025,CEO y jefe de equipo,verificado: the-race.com,alta
+peter-sauber,Peter Sauber,switzerland,,sauber,2000,2005,fundador,Wikipedia – Sauber Motorsport,alta
+mario-theissen,Mario Theissen,germany,,bmw-sauber,2006,2009,,Wikipedia – BMW Sauber,alta
+peter-sauber,Peter Sauber,switzerland,,sauber,2010,2012,hasta octubre de 2012,Wikipedia – Sauber Motorsport,alta
+monisha-kaltenborn,Monisha Kaltenborn,austria,,sauber,2012,2017,octubre de 2012 a junio de 2017,Wikipedia – Sauber Motorsport,alta
+frederic-vasseur,Frédéric Vasseur,france,,sauber,2017,2018,desde julio de 2017,Wikipedia – Sauber Motorsport,alta
+frederic-vasseur,Frédéric Vasseur,france,,alfa-romeo,2019,2022,,Wikipedia – Sauber Motorsport,alta
+alessandro-alunni-bravi,Alessandro Alunni Bravi,italy,,alfa-romeo,2023,2023,representante del equipo,Wikipedia – Sauber Motorsport,alta
+alessandro-alunni-bravi,Alessandro Alunni Bravi,italy,,kick-sauber,2024,2024,representante del equipo,Wikipedia – Sauber Motorsport,alta
+mattia-binotto,Mattia Binotto,switzerland,,kick-sauber,2024,2025,jefe del proyecto Audi desde agosto de 2024,Wikipedia – Sauber Motorsport,media
+jonathan-wheatley,Jonathan Wheatley,united-kingdom,,kick-sauber,2025,2025,desde abril de 2025,Wikipedia – Sauber Motorsport,alta
+giancarlo-minardi,Giancarlo Minardi,italy,,minardi,2000,2000,director general junto con Gabriele Rumi,verificado: Wikipedia – Giancarlo Minardi,alta
+paul-stoddart,Paul Stoddart,australia,,minardi,2001,2005,dueño y jefe de equipo,verificado: autosport.com,alta
+alain-prost,Alain Prost,france,alain-prost,prost,2000,2001,dueño y jefe de equipo; también fue piloto,Wikipedia – Prost Grand Prix,alta
+tom-walkinshaw,Tom Walkinshaw,united-kingdom,,arrows,2000,2002,dueño y jefe de equipo,Wikipedia – Arrows,alta
+ove-andersson,Ove Andersson,sweden,,toyota,2002,2003,,verificado: f1technical.net,alta
+tsutomu-tomita,Tsutomu Tomita,japan,,toyota,2004,2007,hasta junio de 2007,verificado: f1technical.net / Wikipedia,alta
+tadashi-yamashina,Tadashi Yamashina,japan,,toyota,2007,2009,desde junio de 2007,verificado: Wikipedia – Tadashi Yamashina,alta
+aguri-suzuki,Aguri Suzuki,japan,aguri-suzuki,super-aguri,2006,2008,fundador; también fue piloto,Wikipedia – Super Aguri F1,alta
+tony-fernandes,Tony Fernandes,malaysia,,lotus-racing,2010,2011,dueño y jefe de equipo,Wikipedia – Team Lotus (2010–11),alta
+tony-fernandes,Tony Fernandes,malaysia,,caterham,2012,2012,hasta noviembre de 2012,Wikipedia – Caterham F1,alta
+cyril-abiteboul,Cyril Abiteboul,france,,caterham,2012,2014,noviembre de 2012 a julio de 2014,Wikipedia – Caterham F1,media
+christijan-albers,Christijan Albers,netherlands,christijan-albers,caterham,2014,2014,julio a septiembre de 2014; también fue piloto,Wikipedia – Caterham F1,media
+manfredi-ravetto,Manfredi Ravetto,italy,,caterham,2014,2014,desde septiembre de 2014,Wikipedia – Caterham F1,media
+colin-kolles,Colin Kolles,germany,,hrt,2010,2011,,verificado: Wikipedia – Colin Kolles,alta
+luis-perez-sala,Luis Pérez-Sala,spain,luis-perez-sala,hrt,2012,2012,también fue piloto,Wikipedia – HRT,alta
+john-booth,John Booth,united-kingdom,,virgin,2010,2011,,Wikipedia – Marussia F1,alta
+john-booth,John Booth,united-kingdom,,marussia,2012,2015,,verificado: autosport.com,alta
+dave-ryan,Dave Ryan,new-zealand,,manor,2016,2016,"racing director, a cargo del equipo",verificado: Wikipedia – Manor Racing,alta
+guenther-steiner,Guenther Steiner,italy,,haas,2016,2023,,Wikipedia – Haas F1 Team,alta
+ayao-komatsu,Ayao Komatsu,japan,,haas,2024,2025,,Wikipedia – Haas F1 Team,alta
